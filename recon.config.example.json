@@ -1,0 +1,17 @@
+{
+  "$schema": "./recon.config.schema.json",
+  "projectRoot": ".",
+  "languages": {
+    "go": {
+      "enabled": true
+    },
+    "typescript": {
+      "enabled": true,
+      "srcDir": "apps/web"
+    }
+  },
+  "index": {
+    "outputDir": ".recon",
+    "incremental": true
+  }
+}

@@ -1,8 +1,7 @@
 /**
  * MCP Server
  *
- * Creates and configures the CodeMap MCP server with stdio transport.
- * Pattern from GitNexus's server.ts.
+ * Creates and configures the Recon MCP server with stdio transport.
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -12,7 +11,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { KnowledgeGraph } from '../graph/graph.js';
-import { CODEMAP_TOOLS } from './tools.js';
+import { RECON_TOOLS } from './tools.js';
 import { handleToolCall } from './handlers.js';
 import { getNextStepHint } from './hints.js';
 
@@ -23,14 +22,14 @@ const VERSION = '1.0.0';
  */
 export function createServer(graph: KnowledgeGraph): Server {
   const server = new Server(
-    { name: 'codemap', version: VERSION },
+    { name: 'recon', version: VERSION },
     { capabilities: { tools: {}, prompts: {} } },
   );
 
   // ─── ListTools ──────────────────────────────────────────────
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: CODEMAP_TOOLS.map((t) => ({
+    tools: RECON_TOOLS.map((t) => ({
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema,

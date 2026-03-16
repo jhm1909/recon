@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CLI Commands
  *
  * Implementation of index, serve, status, clean commands.
@@ -42,30 +42,30 @@ function getGitInfo(cwd: string): { commit: string; branch: string } {
   }
 }
 
-// ─── index command ───────────────────────────────────────────────
+// ??? index command ???????????????????????????????????????????????
 
 export async function indexCommand(options: { force?: boolean }): Promise<void> {
   const startTime = performance.now();
   const projectRoot = findProjectRoot();
 
-  console.log(`[codemap] Indexing from ${projectRoot}...`);
+  console.log(`[recon] Indexing from ${projectRoot}...`);
 
   // Load previous index for incremental comparison
   const previousIndex = options.force ? null : await loadIndex(projectRoot);
   const previousHashes = previousIndex?.meta.fileHashes;
 
   if (previousIndex && !options.force) {
-    console.log('[codemap] Previous index found — using incremental mode.');
+    console.log('[recon] Previous index found ??using incremental mode.');
   }
 
   // Run Go package analysis
-  console.log('[codemap] Analyzing Go packages...');
+  console.log('[recon] Analyzing Go packages...');
   const modulePath = getModulePath(projectRoot);
   const packages = runGoList(projectRoot);
   const goResult = analyzeGoPackages(projectRoot);
 
   // Run Go symbol analysis (incremental)
-  console.log('[codemap] Analyzing Go symbols...');
+  console.log('[recon] Analyzing Go symbols...');
   const symbolResult = await analyzeGoSymbols(
     projectRoot,
     packages,
@@ -75,7 +75,7 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
 
   if (symbolResult.stats.skipped > 0) {
     console.log(
-      `[codemap] Incremental: analyzed ${symbolResult.stats.analyzed} packages, ` +
+      `[recon] Incremental: analyzed ${symbolResult.stats.analyzed} packages, ` +
       `skipped ${symbolResult.stats.skipped} unchanged`,
     );
   }
@@ -127,12 +127,12 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
   }
 
   // Run TypeScript analysis
-  console.log('[codemap] Analyzing TypeScript...');
+  console.log('[recon] Analyzing TypeScript...');
   const tsResult = await analyzeTypeScript(projectRoot, 'apps/web', previousHashes);
 
   if (tsResult.stats.skipped > 0) {
     console.log(
-      `[codemap] Incremental TS: analyzed ${tsResult.stats.files} files, ` +
+      `[recon] Incremental TS: analyzed ${tsResult.stats.files} files, ` +
       `skipped ${tsResult.stats.skipped} unchanged`,
     );
   }
@@ -172,7 +172,7 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
   }
 
   // Cross-language analysis: link TS API calls to Go handlers
-  console.log('[codemap] Analyzing cross-language API links...');
+  console.log('[recon] Analyzing cross-language API links...');
   const existingNodeIds = new Set<string>();
   for (const [id] of graph.nodes) existingNodeIds.add(id);
 
@@ -184,7 +184,7 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
     graph.addRelationship(rel);
   }
   console.log(
-    `[codemap] Found ${crossLangResult.routes.length} API routes, ` +
+    `[recon] Found ${crossLangResult.routes.length} API routes, ` +
     `${crossLangResult.result.relationships.length} cross-language edges`,
   );
 
@@ -226,11 +226,11 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
   await saveIndex(projectRoot, graph, meta);
 
   console.log(
-    `[codemap] Indexed ${goPackages} Go packages, ${goSymbols} Go symbols, ` +
+    `[recon] Indexed ${goPackages} Go packages, ${goSymbols} Go symbols, ` +
     `${tsFiles} TS files, ${tsSymbols} TS symbols, ` +
     `${graph.relationshipCount} relationships in ${elapsed}ms`,
   );
-  console.log(`[codemap] Saved to ${join(projectRoot, '.codemap/')}`);
+  console.log(`[recon] Saved to ${join(projectRoot, '.recon/')}`);
 }
 
 /**
@@ -252,31 +252,31 @@ function countPreviousSymbols(
   return count;
 }
 
-// ─── serve command ───────────────────────────────────────────────
+// ??? serve command ???????????????????????????????????????????????
 
 export async function serveCommand(): Promise<void> {
   const projectRoot = findProjectRoot();
   const stored = await loadIndex(projectRoot);
 
   if (!stored) {
-    console.error("[codemap] No index found. Run 'npx codemap index' first.");
+    console.error("[recon] No index found. Run 'npx recon index' first.");
     process.exit(1);
   }
 
-  console.error(`[codemap] Loaded index: ${stored.graph.nodeCount} nodes, ${stored.graph.relationshipCount} relationships`);
-  console.error('[codemap] MCP server starting on stdio...');
+  console.error(`[recon] Loaded index: ${stored.graph.nodeCount} nodes, ${stored.graph.relationshipCount} relationships`);
+  console.error('[recon] MCP server starting on stdio...');
 
   await startServer(stored.graph);
 }
 
-// ─── status command ──────────────────────────────────────────────
+// ??? status command ??????????????????????????????????????????????
 
 export async function statusCommand(): Promise<void> {
   const projectRoot = findProjectRoot();
   const stored = await loadIndex(projectRoot);
 
   if (!stored) {
-    console.log('[codemap] No index found. Run "npx codemap index" first.');
+    console.log('[recon] No index found. Run "npx recon index" first.');
     return;
   }
 
@@ -284,10 +284,10 @@ export async function statusCommand(): Promise<void> {
   const git = getGitInfo(projectRoot);
   const stale = meta.gitCommit !== git.commit;
 
-  console.log('CodeMap Index Status');
-  console.log('═══════════════════════════════════');
+  console.log('Recon Index Status');
+  console.log('='.repeat(34));
   console.log(`  Indexed at:     ${meta.indexedAt}`);
-  console.log(`  Git commit:     ${meta.gitCommit}${stale ? ` (HEAD is ${git.commit} — STALE)` : ' (current)'}`);
+  console.log(`  Git commit:     ${meta.gitCommit}${stale ? ` (HEAD is ${git.commit} ??STALE)` : ' (current)'}`);
   console.log(`  Git branch:     ${meta.gitBranch}`);
   console.log(`  Go packages:    ${meta.stats.goPackages}`);
   console.log(`  Go symbols:     ${meta.stats.goSymbols}`);
@@ -299,20 +299,21 @@ export async function statusCommand(): Promise<void> {
 
   if (stale) {
     console.log('');
-    console.log('  ⚠ Index is stale. Run "npx codemap index" to update.');
+    console.log('  ??Index is stale. Run "npx recon index" to update.');
   }
 }
 
-// ─── clean command ───────────────────────────────────────────────
+// ??? clean command ???????????????????????????????????????????????
 
 export function cleanCommand(): void {
   const projectRoot = findProjectRoot();
-  const codemapDir = join(projectRoot, '.codemap');
+  const reconDir = join(projectRoot, '.recon');
 
-  if (existsSync(codemapDir)) {
-    rmSync(codemapDir, { recursive: true, force: true });
-    console.log('[codemap] Index cleaned.');
+  if (existsSync(reconDir)) {
+    rmSync(reconDir, { recursive: true, force: true });
+    console.log('[recon] Index cleaned.');
   } else {
-    console.log('[codemap] No index to clean.');
+    console.log('[recon] No index to clean.');
   }
 }
+

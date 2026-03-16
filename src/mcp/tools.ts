@@ -1,8 +1,8 @@
-/**
+﻿/**
  * MCP Tool Definitions
  *
  * Defines tools exposed to AI agents via MCP protocol.
- * Pattern inspired by GitNexus's tools.ts.
+ * Defines the 6 tools exposed via MCP protocol.
  */
 
 export interface ToolDefinition {
@@ -21,13 +21,13 @@ export interface ToolDefinition {
   };
 }
 
-export const CODEMAP_TOOLS: ToolDefinition[] = [
+export const RECON_TOOLS: ToolDefinition[] = [
   {
-    name: 'codemap_packages',
+    name: 'recon_packages',
     description: `List all packages (Go) and modules (TypeScript) with their dependency relationships. High-level architecture overview.
 
 WHEN TO USE: First step when exploring the codebase. Understand which packages exist and how they depend on each other.
-AFTER THIS: Use codemap_impact() to check blast radius before editing a package.`,
+AFTER THIS: Use recon_impact() to check blast radius before editing a package.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -42,11 +42,11 @@ AFTER THIS: Use codemap_impact() to check blast radius before editing a package.
     },
   },
   {
-    name: 'codemap_impact',
+    name: 'recon_impact',
     description: `Analyze the blast radius of changing a code symbol. Returns affected symbols grouped by depth, plus risk assessment.
 
-WHEN TO USE: Before making code changes — especially refactoring, renaming, or modifying shared code. Shows what would break.
-AFTER THIS: Review d=1 items (WILL BREAK). Use codemap_context({name}) on high-risk symbols.
+WHEN TO USE: Before making code changes ??especially refactoring, renaming, or modifying shared code. Shows what would break.
+AFTER THIS: Review d=1 items (WILL BREAK). Use recon_context({name}) on high-risk symbols.
 
 Depth groups:
 - d=1: WILL BREAK (direct callers/importers)
@@ -95,11 +95,11 @@ Risk levels: LOW (0-2 d1), MEDIUM (3-9), HIGH (10-19), CRITICAL (20+ or cross-ap
     },
   },
   {
-    name: 'codemap_context',
+    name: 'recon_context',
     description: `360-degree view of a single code symbol. Shows callers, callees, imports, methods, and implementation relationships.
 
-WHEN TO USE: After codemap_query or codemap_impact to understand a specific symbol in depth. When you need to know all callers, callees, and dependencies.
-AFTER THIS: Use codemap_impact() if planning changes.`,
+WHEN TO USE: After recon_query or recon_impact to understand a specific symbol in depth. When you need to know all callers, callees, and dependencies.
+AFTER THIS: Use recon_impact() if planning changes.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -121,11 +121,11 @@ AFTER THIS: Use codemap_impact() if planning changes.`,
     },
   },
   {
-    name: 'codemap_query',
+    name: 'recon_query',
     description: `Search the knowledge graph for symbols by name or pattern. Use when you need to find a function, struct, or component by name.
 
-WHEN TO USE: When you need to find a function, struct, or component by name. Complements grep — returns structured results with dependency info.
-AFTER THIS: Use codemap_context({name}) for 360° view of a result.`,
+WHEN TO USE: When you need to find a function, struct, or component by name. Complements grep ??returns structured results with dependency info.
+AFTER THIS: Use recon_context({name}) for 360째 view of a result.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -157,11 +157,11 @@ AFTER THIS: Use codemap_context({name}) for 360° view of a result.`,
     },
   },
   {
-    name: 'codemap_detect_changes',
+    name: 'recon_detect_changes',
     description: `Analyze uncommitted git changes and find affected symbols and their dependents. Maps git diff hunks to indexed symbols, then traces impact through the dependency graph.
 
-WHEN TO USE: Before committing — to understand what your changes affect. Pre-commit review, PR preparation.
-AFTER THIS: Review affected symbols. Use codemap_context() on high-risk items.`,
+WHEN TO USE: Before committing ??to understand what your changes affect. Pre-commit review, PR preparation.
+AFTER THIS: Review affected symbols. Use recon_context() on high-risk items.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -181,11 +181,11 @@ AFTER THIS: Review affected symbols. Use codemap_context() on high-risk items.`,
     },
   },
   {
-    name: 'codemap_api_map',
-    description: `Show the full API route map: HTTP endpoint → Go handler → TypeScript consumers. Cross-language traceability.
+    name: 'recon_api_map',
+    description: `Show the full API route map: HTTP endpoint ??Go handler ??TypeScript consumers. Cross-language traceability.
 
 WHEN TO USE: When you need to understand how frontend calls map to backend handlers, find which TS files call a specific API endpoint, or audit API coverage.
-AFTER THIS: Use codemap_context({name}) on a specific handler for full dependency info.`,
+AFTER THIS: Use recon_context({name}) on a specific handler for full dependency info.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -207,3 +207,4 @@ AFTER THIS: Use codemap_context({name}) on a specific handler for full dependenc
     },
   },
 ];
+

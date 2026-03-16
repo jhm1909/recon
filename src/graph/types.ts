@@ -1,7 +1,7 @@
 /**
  * Graph Type System
  *
- * Core types for the CodeMap knowledge graph.
+ * Core types for the Recon knowledge graph.
  * Node ID conventions use namespaced prefixes to avoid collisions:
  *   Go:  go:pkg:, go:file:, go:func:, go:method:, go:struct:, go:iface:
  *   TS:  ts:mod:, ts:file:, ts:comp:, ts:func:, ts:type:

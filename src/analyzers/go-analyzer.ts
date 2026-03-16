@@ -31,7 +31,7 @@ export function runGoList(projectRoot: string): GoPackage[] {
     return parseNDJSON(output);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[codemap] Warning: go list failed — ${message.split('\n')[0]}`);
+    console.error(`[recon] Warning: go list failed — ${message.split('\n')[0]}`);
     return [];
   }
 }
@@ -81,7 +81,7 @@ export function getModulePath(projectRoot: string): string {
     });
     return output.trim();
   } catch {
-    return 'github.com/Hubdustry/hubdustry';
+    return 'unknown/module';
   }
 }
 
@@ -186,17 +186,17 @@ export function analyzeGoPackages(projectRoot: string): AnalyzerResult {
  * Returns the binary path, or null if build fails.
  */
 function getAnalyzerBinary(projectRoot: string): string | null {
-  const analyzerDir = join(projectRoot, 'tools', 'codemap', 'analyzer');
+  const analyzerDir = join(projectRoot, 'analyzer');
   const ext = process.platform === 'win32' ? '.exe' : '';
   const binaryPath = join(analyzerDir, `analyzer${ext}`);
 
   if (!existsSync(join(analyzerDir, 'go.mod'))) {
-    console.error('[codemap] Warning: analyzer source not found at tools/codemap/analyzer/');
+    console.error('[recon] Warning: analyzer source not found at analyzer/');
     return null;
   }
 
   if (!existsSync(binaryPath)) {
-    console.log('[codemap] Building Go AST analyzer...');
+    console.log('[recon] Building Go AST analyzer...');
     try {
       execSync(`go build -o analyzer${ext} .`, {
         cwd: analyzerDir,
@@ -205,7 +205,7 @@ function getAnalyzerBinary(projectRoot: string): string | null {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[codemap] Warning: failed to build analyzer — ${message.split('\\n')[0]}`);
+      console.error(`[recon] Warning: failed to build analyzer — ${message.split('\\n')[0]}`);
       return null;
     }
   }
@@ -501,7 +501,7 @@ export async function analyzeGoSymbols(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(
-        `[codemap] Warning: analyzer failed for ${pkgRelPath} — ${message.split('\\n')[0]}`,
+        `[recon] Warning: analyzer failed for ${pkgRelPath} — ${message.split('\\n')[0]}`,
       );
     }
   }

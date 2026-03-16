@@ -1,12 +1,32 @@
-# CodeMap
+# Recon
 
-Lightweight code intelligence MCP server for the Hubdustry monorepo. Builds a knowledge graph of Go and TypeScript symbols, tracks cross-language API calls, and exposes 6 tools to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/).
+Lightweight code intelligence engine for AI agents. Builds a knowledge graph of Go and TypeScript symbols, tracks cross-language API calls, and exposes 6 tools via [Model Context Protocol](https://modelcontextprotocol.io/).
+
+> Give your AI agent architectural awareness — dependency mapping, blast radius analysis, and call graph traversal without reading every file.
+
+---
+
+## Why Recon?
+
+AI coding agents are blind to architecture. They grep, they guess, they break things. Recon fixes this by indexing your codebase into a knowledge graph that agents can query through MCP:
+
+- **Blast radius before editing** — know what breaks before you touch it
+- **Cross-language tracing** — follow API calls from TypeScript frontend to Go backend
+- **Incremental indexing** — sub-second re-index on file changes
+- **Zero config** — point it at a repo, run `npx recon index`, done
+
+## Supported Languages
+
+| Language | What's indexed |
+|----------|---------------|
+| **Go** | Packages, functions, methods, structs, interfaces, call graph, imports |
+| **TypeScript** | Modules, components, functions, types, JSX usage, imports |
+| **Cross-language** | HTTP API routes mapped from Go handlers to TypeScript consumers |
 
 ## Architecture
 
 ```
-tools/codemap/
-├── bin/codemap              # CLI entry point
+├── bin/recon                # CLI entry point
 ├── src/
 │   ├── analyzers/
 │   │   ├── go-analyzer.ts   # Go packages + AST symbol extraction
@@ -22,14 +42,14 @@ tools/codemap/
 │   │   ├── handlers.ts      # Tool dispatch + query logic
 │   │   └── hints.ts         # Next-step hints appended to responses
 │   ├── storage/
-│   │   ├── store.ts         # JSON file I/O (.codemap/)
+│   │   ├── store.ts         # JSON file I/O (.recon/)
 │   │   └── types.ts         # IndexMeta, IndexStats
 │   ├── utils/
 │   │   └── hash.ts          # SHA-256 file hashing
 │   └── cli/
 │       ├── index.ts         # Commander CLI setup
 │       └── commands.ts      # index, serve, status, clean commands
-└── tools/ast-analyzer/      # Go AST CLI (built automatically)
+└── analyzer/                # Go AST CLI (built automatically)
     └── main.go
 ```
 
@@ -37,26 +57,27 @@ tools/codemap/
 
 ```
   go list → Go packages      ─┐
-  Go AST CLI → symbols/calls  ├─→ KnowledgeGraph ─→ .codemap/graph.json
-  TS Compiler API → components ├─→   (in-memory)  ─→ .codemap/meta.json
+  Go AST CLI → symbols/calls  ├─→ KnowledgeGraph ─→ .recon/graph.json
+  TS Compiler API → components ├─→   (in-memory)  ─→ .recon/meta.json
   router.go → API routes      ─┘
                                          │
                                     MCP Server (stdio)
                                          │
                               ┌──────────┼──────────┐
                               │          │          │
-                         Claude Code  Antigravity  Other MCP clients
+                         Claude Code   Cursor    Other MCP clients
 ```
 
 ## Installation
 
 ```bash
-cd tools/codemap
+git clone https://github.com/jhm1909/recon.git
+cd recon
 npm install
 npm run build
 ```
 
-The Go AST analyzer binary is built automatically on first index.
+Requires Node.js >= 20 and Go (for AST analysis). The Go AST analyzer binary is built automatically on first index.
 
 ## Usage
 
@@ -64,31 +85,31 @@ The Go AST analyzer binary is built automatically on first index.
 
 ```bash
 # Index the codebase (incremental by default)
-npx codemap index
+npx recon index
 
 # Force full re-index
-npx codemap index --force
+npx recon index --force
 
 # Show index status
-npx codemap status
+npx recon status
 
 # Start MCP server on stdio
-npx codemap serve
+npx recon serve
 
 # Delete index
-npx codemap clean
+npx recon clean
 ```
 
 ### MCP Integration
 
-Add to `.claude/mcp.json` or equivalent:
+Add to your MCP client config (e.g., `.claude/mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "codemap": {
+    "recon": {
       "command": "node",
-      "args": ["tools/codemap/dist/cli/index.js", "serve"]
+      "args": ["/path/to/recon/dist/cli/index.js", "serve"]
     }
   }
 }
@@ -96,7 +117,7 @@ Add to `.claude/mcp.json` or equivalent:
 
 ## Tool Reference
 
-### codemap_packages
+### recon_packages
 
 List all packages (Go) and modules (TypeScript) with dependency relationships.
 
@@ -104,7 +125,7 @@ List all packages (Go) and modules (TypeScript) with dependency relationships.
 |-----------|------|-------------|
 | `language` | `"go" \| "typescript" \| "all"` | Filter by language (default: `"all"`) |
 
-### codemap_query
+### recon_query
 
 Search the knowledge graph for symbols by name or pattern.
 
@@ -116,7 +137,7 @@ Search the knowledge graph for symbols by name or pattern.
 | `language` | `"go" \| "typescript"` | Filter by language |
 | `limit` | `number` | Max results (default: 20) |
 
-### codemap_context
+### recon_context
 
 360-degree view of a single symbol — callers, callees, imports, methods, implementations.
 
@@ -126,7 +147,7 @@ Search the knowledge graph for symbols by name or pattern.
 | `file` | `string` | Disambiguate when multiple symbols share a name |
 | `includeSource` | `boolean` | Include source code (default: `false`) |
 
-### codemap_impact
+### recon_impact
 
 Blast radius analysis — what breaks if you change a symbol.
 
@@ -137,12 +158,12 @@ Blast radius analysis — what breaks if you change a symbol.
 | `maxDepth` | `number` | Traversal depth (default: 3) |
 | `includeTests` | `boolean` | Include test files (default: `false`) |
 | `relationTypes` | `string[]` | Filter edges: `CALLS`, `IMPORTS`, `HAS_METHOD`, `IMPLEMENTS`, `USES_COMPONENT`, `CALLS_API` |
-| `minConfidence` | `number` | Confidence threshold 0.0–1.0 (default: 0.0) |
+| `minConfidence` | `number` | Confidence threshold 0.0-1.0 (default: 0.0) |
 | `file` | `string` | Disambiguate by file path substring |
 
-**Risk levels:** LOW (0–2 d1), MEDIUM (3–9), HIGH (10–19), CRITICAL (20+ or cross-app)
+**Risk levels:** LOW (0-2 d1), MEDIUM (3-9), HIGH (10-19), CRITICAL (20+ or cross-app)
 
-### codemap_detect_changes
+### recon_detect_changes
 
 Map git diff to affected symbols and trace blast radius.
 
@@ -151,9 +172,9 @@ Map git diff to affected symbols and trace blast radius.
 | `scope` | `"unstaged" \| "staged" \| "all" \| "branch"` | What to analyze (default: `"all"`) |
 | `base` | `string` | Base branch for `"branch"` scope (default: `"main"`) |
 
-### codemap_api_map
+### recon_api_map
 
-Cross-language API route map — endpoint → Go handler → TypeScript consumers.
+Cross-language API route map — endpoint -> Go handler -> TypeScript consumers.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -190,25 +211,15 @@ Force full re-index with `--force` if the graph seems stale.
 
 | Type | Meaning | Confidence |
 |------|---------|------------|
-| CONTAINS | Package/Module → File | 1.0 |
-| DEFINES | File → Symbol | 1.0 |
-| CALLS | Function → Function | 0.5–1.0 |
-| IMPORTS | Package → Package / File → File | 1.0 |
-| HAS_METHOD | Struct → Method | 1.0 |
-| IMPLEMENTS | Struct → Interface | 0.8 |
-| USES_COMPONENT | Component → Component (JSX) | 0.9 |
-| CALLS_API | TS Function → Go Handler (cross-language) | 0.85–0.95 |
+| CONTAINS | Package/Module -> File | 1.0 |
+| DEFINES | File -> Symbol | 1.0 |
+| CALLS | Function -> Function | 0.5-1.0 |
+| IMPORTS | Package -> Package / File -> File | 1.0 |
+| HAS_METHOD | Struct -> Method | 1.0 |
+| IMPLEMENTS | Struct -> Interface | 0.8 |
+| USES_COMPONENT | Component -> Component (JSX) | 0.9 |
+| CALLS_API | TS Function -> Go Handler (cross-language) | 0.85-0.95 |
 
-## Current Stats
+## License
 
-```
-Go packages:    78
-Go symbols:     2,651
-TS files:       388
-TS symbols:     710
-Relationships:  24,337
-API routes:     191
-Cross-lang edges: 28
-Total nodes:    4,592
-Index time:     ~34s (full), ~5s (incremental)
-```
+[MIT](LICENSE)

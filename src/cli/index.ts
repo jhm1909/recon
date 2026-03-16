@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * CodeMap CLI
+ * Recon CLI
  *
- * Code intelligence tool for the Hubdustry monorepo.
- * Usage: npx codemap <command>
+ * Lightweight code intelligence for any Go + TypeScript codebase.
+ * Usage: npx recon <command>
  */
 
 import { Command } from 'commander';
@@ -13,9 +13,9 @@ import { indexCommand, serveCommand, statusCommand, cleanCommand } from './comma
 const program = new Command();
 
 program
-  .name('codemap')
+  .name('recon')
   .version('1.0.0')
-  .description('Lightweight code intelligence for the Hubdustry monorepo');
+  .description('Lightweight code intelligence for Go + TypeScript codebases');
 
 program
   .command('index')
@@ -41,7 +41,7 @@ program
 
 program
   .command('clean')
-  .description('Delete the .codemap/ index directory')
+  .description('Delete the .recon/ index directory')
   .action(() => {
     cleanCommand();
   });

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MCP Tool Handlers
  *
  * Dispatches tool calls to the appropriate query functions.
@@ -18,22 +18,22 @@ export async function handleToolCall(
   graph: KnowledgeGraph,
 ): Promise<string> {
   switch (name) {
-    case 'codemap_packages':
+    case 'recon_packages':
       return handlePackages(args, graph);
 
-    case 'codemap_impact':
+    case 'recon_impact':
       return handleImpact(args, graph);
 
-    case 'codemap_context':
+    case 'recon_context':
       return handleContext(args, graph);
 
-    case 'codemap_query':
+    case 'recon_query':
       return handleQuery(args, graph);
 
-    case 'codemap_detect_changes':
+    case 'recon_detect_changes':
       return handleDetectChanges(args, graph);
 
-    case 'codemap_api_map':
+    case 'recon_api_map':
       return handleApiMap(args, graph);
 
     default:
@@ -41,7 +41,7 @@ export async function handleToolCall(
   }
 }
 
-// ─── codemap_packages ────────────────────────────────────────────
+// ??? recon_packages ????????????????????????????????????????????
 
 function handlePackages(
   args: Record<string, unknown> | undefined,
@@ -79,7 +79,7 @@ function handlePackages(
 
   // Format output
   const lines: string[] = [
-    `# CodeMap — Package Overview`,
+    `# Recon ??Package Overview`,
     '',
     `**Stats:** ${packages.length} packages, ${totalRels} relationships`,
     '',
@@ -106,7 +106,7 @@ function handlePackages(
   return lines.join('\n');
 }
 
-// ─── codemap_impact ──────────────────────────────────────────────
+// ??? recon_impact ??????????????????????????????????????????????
 
 function handleImpact(
   args: Record<string, unknown> | undefined,
@@ -129,7 +129,7 @@ function handleImpact(
   // Find target node
   let matches = graph.findByName(target);
   if (matches.length === 0) {
-    throw new Error(`Symbol '${target}' not found. Try codemap_query({query: "${target}"}) to search.`);
+    throw new Error(`Symbol '${target}' not found. Try recon_query({query: "${target}"}) to search.`);
   }
 
   // Apply file filter if provided
@@ -174,9 +174,9 @@ function handleImpact(
 
   const depthLabels = [
     '',
-    'WILL BREAK — direct callers/importers',
-    'LIKELY AFFECTED — indirect dependents',
-    'MAY NEED TESTING — transitive',
+    'WILL BREAK ??direct callers/importers',
+    'LIKELY AFFECTED ??indirect dependents',
+    'MAY NEED TESTING ??transitive',
   ];
 
   for (let depth = 1; depth <= maxDepth && frontier.length > 0; depth++) {
@@ -244,7 +244,7 @@ function handleImpact(
   const lines: string[] = [
     `# Impact Analysis: ${targetNode.name}`,
     '',
-    `**Target:** ${targetNode.name} (${targetNode.type}) — \`${targetNode.file}:${targetNode.startLine}\``,
+    `**Target:** ${targetNode.name} (${targetNode.type}) ??\`${targetNode.file}:${targetNode.startLine}\``,
     `**Direction:** ${direction}`,
     `**Risk:** ${risk}`,
     `**Summary:** ${d1Count} direct ${direction === 'upstream' ? 'callers' : 'callees'}, ${totalAffected} total affected`,
@@ -256,7 +256,7 @@ function handleImpact(
     lines.push('');
 
     for (const sym of group.symbols) {
-      lines.push(`- **${sym.name}** (${sym.type}) — \`${sym.file}:${sym.line}\` [${sym.edgeType}, ${sym.confidence}]`);
+      lines.push(`- **${sym.name}** (${sym.type}) ??\`${sym.file}:${sym.line}\` [${sym.edgeType}, ${sym.confidence}]`);
     }
     lines.push('');
   }
@@ -264,7 +264,7 @@ function handleImpact(
   return lines.join('\n');
 }
 
-// ─── codemap_context ─────────────────────────────────────────────
+// ??? recon_context ?????????????????????????????????????????????
 
 function handleContext(
   args: Record<string, unknown> | undefined,
@@ -282,7 +282,7 @@ function handleContext(
   }
 
   if (matches.length === 0) {
-    throw new Error(`Symbol '${name}' not found. Try codemap_query({query: "${name}"}) to search.`);
+    throw new Error(`Symbol '${name}' not found. Try recon_query({query: "${name}"}) to search.`);
   }
 
   if (matches.length > 1 && !fileFilter) {
@@ -349,7 +349,7 @@ function handleContext(
       lines.push('_none_');
     } else {
       for (const ref of refs) {
-        lines.push(`- ${ref.name} — \`${ref.file}:${ref.line}\` [${ref.edgeType}]`);
+        lines.push(`- ${ref.name} ??\`${ref.file}:${ref.line}\` [${ref.edgeType}]`);
       }
     }
     lines.push('');
@@ -358,7 +358,7 @@ function handleContext(
   return lines.join('\n');
 }
 
-// ─── codemap_query ───────────────────────────────────────────────
+// ??? recon_query ???????????????????????????????????????????????
 
 function handleQuery(
   args: Record<string, unknown> | undefined,
@@ -411,7 +411,7 @@ function handleQuery(
     const calleeCount = graph.getOutgoing(node.id, RelationshipType.CALLS).length;
 
     lines.push(
-      `- **${node.name}** (${node.type}) — \`${node.file}:${node.startLine}\` | ${node.language} | ` +
+      `- **${node.name}** (${node.type}) ??\`${node.file}:${node.startLine}\` | ${node.language} | ` +
       `callers: ${callerCount}, callees: ${calleeCount}${node.exported ? '' : ' [unexported]'}`,
     );
   }
@@ -419,7 +419,7 @@ function handleQuery(
   return lines.join('\n');
 }
 
-// ─── codemap_detect_changes ──────────────────────────────────────
+// ??? recon_detect_changes ??????????????????????????????????????
 
 interface DiffHunk {
   file: string;
@@ -673,7 +673,7 @@ function handleDetectChanges(
   for (const f of changedFiles) {
     const symbolsInFile = uniqueSymbols.filter(s => s.node.file === f);
     const modCount = symbolsInFile.filter(s => s.reason === 'modified').length;
-    lines.push(`- \`${f}\` — ${symbolsInFile.length} symbols${modCount > 0 ? ` (${modCount} directly modified)` : ''}`);
+    lines.push(`- \`${f}\` ??${symbolsInFile.length} symbols${modCount > 0 ? ` (${modCount} directly modified)` : ''}`);
   }
   lines.push('');
 
@@ -684,7 +684,7 @@ function handleDetectChanges(
     for (const cs of directlyModified) {
       const callerCount = graph.getIncoming(cs.node.id, RelationshipType.CALLS).length;
       lines.push(
-        `- **${cs.node.name}** (${cs.node.type}) — \`${cs.node.file}:${cs.node.startLine}\` | ${callerCount} callers`,
+        `- **${cs.node.name}** (${cs.node.type}) ??\`${cs.node.file}:${cs.node.startLine}\` | ${callerCount} callers`,
       );
     }
     lines.push('');
@@ -692,11 +692,11 @@ function handleDetectChanges(
 
   // d=1 affected
   if (d1.length > 0) {
-    lines.push(`## d=1: WILL BREAK — direct dependents (${d1.length})`);
+    lines.push(`## d=1: WILL BREAK ??direct dependents (${d1.length})`);
     lines.push('');
     for (const a of d1) {
       lines.push(
-        `- **${a.node.name}** (${a.node.type}) — \`${a.node.file}:${a.node.startLine}\` [${a.edgeType} ← ${a.via}]`,
+        `- **${a.node.name}** (${a.node.type}) ??\`${a.node.file}:${a.node.startLine}\` [${a.edgeType} ??${a.via}]`,
       );
     }
     lines.push('');
@@ -704,11 +704,11 @@ function handleDetectChanges(
 
   // d=2 affected
   if (d2.length > 0) {
-    lines.push(`## d=2: LIKELY AFFECTED — indirect dependents (${d2.length})`);
+    lines.push(`## d=2: LIKELY AFFECTED ??indirect dependents (${d2.length})`);
     lines.push('');
     for (const a of d2) {
       lines.push(
-        `- **${a.node.name}** (${a.node.type}) — \`${a.node.file}:${a.node.startLine}\` [${a.edgeType} ← ${a.via}]`,
+        `- **${a.node.name}** (${a.node.type}) ??\`${a.node.file}:${a.node.startLine}\` [${a.edgeType} ??${a.via}]`,
       );
     }
     lines.push('');
@@ -716,17 +716,17 @@ function handleDetectChanges(
 
   // Cross-app warning
   if (crossApp) {
-    lines.push('## ⚠ Cross-App Impact');
+    lines.push('## ??Cross-App Impact');
     lines.push('');
     lines.push(`Affected apps: ${Array.from(affectedApps).join(', ')}`);
-    lines.push('Changes span multiple applications — coordinate carefully.');
+    lines.push('Changes span multiple applications ??coordinate carefully.');
     lines.push('');
   }
 
   return lines.join('\n');
 }
 
-// ─── codemap_api_map ────────────────────────────────────────────
+// ??? recon_api_map ????????????????????????????????????????????
 
 function handleApiMap(
   args: Record<string, unknown> | undefined,
@@ -830,12 +830,12 @@ function handleApiMap(
 
     for (const ep of endpoints) {
       lines.push(`### ${ep.method} ${ep.pattern}`);
-      lines.push(`Handler: **${ep.handler.name}** — \`${ep.handler.file}:${ep.handler.startLine}\``);
+      lines.push(`Handler: **${ep.handler.name}** ??\`${ep.handler.file}:${ep.handler.startLine}\``);
 
       if (ep.consumers.length > 0) {
         lines.push(`Consumers (${ep.consumers.length}):`);
         for (const c of ep.consumers) {
-          lines.push(`  - ${c.name} — \`${c.file}:${c.startLine}\``);
+          lines.push(`  - ${c.name} ??\`${c.file}:${c.startLine}\``);
         }
       }
       lines.push('');
@@ -847,7 +847,7 @@ function handleApiMap(
     lines.push('## Uncovered Handlers (no TS consumer found)');
     lines.push('');
     for (const h of uncoveredHandlers.sort((a, b) => a.name.localeCompare(b.name))) {
-      lines.push(`- **${h.name}** — \`${h.file}:${h.startLine}\``);
+      lines.push(`- **${h.name}** ??\`${h.file}:${h.startLine}\``);
     }
     lines.push('');
   }
@@ -855,7 +855,7 @@ function handleApiMap(
   return lines.join('\n');
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────
+// ??? Helpers ?????????????????????????????????????????????????????
 
 function formatDisambiguation(name: string, matches: Node[]): string {
   const lines = [
@@ -866,11 +866,11 @@ function formatDisambiguation(name: string, matches: Node[]): string {
   ];
 
   for (const m of matches) {
-    lines.push(`- **${m.name}** (${m.type}) — \`${m.file}:${m.startLine}\` [${m.package}]`);
+    lines.push(`- **${m.name}** (${m.type}) ??\`${m.file}:${m.startLine}\` [${m.package}]`);
   }
 
   lines.push('');
-  lines.push(`**Hint:** Call codemap_context({name: "${name}", file: "${matches[0].file}"}) to select one.`);
+  lines.push(`**Hint:** Call recon_context({name: "${name}", file: "${matches[0].file}"}) to select one.`);
 
   return lines.join('\n');
 }
@@ -893,3 +893,4 @@ function refFromRel(
 function isTestFile(file: string): boolean {
   return file.endsWith('_test.go') || file.endsWith('.test.ts') || file.endsWith('.test.tsx') || file.endsWith('.spec.ts') || file.endsWith('.spec.tsx');
 }
+

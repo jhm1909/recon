@@ -4,12 +4,31 @@
   "description": "Lightweight code intelligence engine for AI agents. Dependency mapping, blast radius analysis, and call graph via MCP.",
   "type": "module",
   "bin": {
-    "codemap": "./bin/codemap"
+    "recon": "./bin/recon"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
   },
+  "keywords": [
+    "code-intelligence",
+    "mcp",
+    "dependency-graph",
+    "blast-radius",
+    "call-graph",
+    "go",
+    "typescript",
+    "ai-agents"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhm1909/recon.git"
+  },
+  "homepage": "https://github.com/jhm1909/recon#readme",
+  "bugs": {
+    "url": "https://github.com/jhm1909/recon/issues"
+  },
+  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "commander": "^13.1.0"

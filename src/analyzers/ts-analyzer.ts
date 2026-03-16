@@ -583,7 +583,7 @@ export async function analyzeTypeScript(
   const srcRoot = join(webAppRoot, 'src');
 
   if (!existsSync(srcRoot)) {
-    console.error(`[codemap] Warning: ${srcRoot} not found — skipping TS analysis`);
+    console.error(`[recon] Warning: ${srcRoot} not found — skipping TS analysis`);
     return {
       result: { nodes: [], relationships: [] },
       fileHashes: {},
@@ -593,7 +593,7 @@ export async function analyzeTypeScript(
 
   // 1. Discover files
   const files = discoverTSFiles(srcRoot);
-  console.log(`[codemap] Found ${files.length} TypeScript files`);
+  console.log(`[recon] Found ${files.length} TypeScript files`);
 
   // 2. Hash for incremental indexing
   const absoluteHashes = await hashFiles(files);
@@ -632,7 +632,7 @@ export async function analyzeTypeScript(
       fileAnalyses.set(relPath, analysis);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[codemap] Warning: failed to parse ${relPath} — ${message.split('\n')[0]}`);
+      console.error(`[recon] Warning: failed to parse ${relPath} — ${message.split('\n')[0]}`);
     }
   }
 

@@ -1,7 +1,7 @@
 /**
  * JSON File Store
  *
- * Reads/writes graph.json + meta.json to .codemap/ directory.
+ * Reads/writes graph.json + meta.json to .recon/ directory.
  */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { KnowledgeGraph } from '../graph/graph.js';
 import type { IndexMeta } from './types.js';
 
-const CODEMAP_DIR = '.codemap';
+const RECON_DIR = '.recon';
 const GRAPH_FILE = 'graph.json';
 const META_FILE = 'meta.json';
 
@@ -20,7 +20,7 @@ export interface StoredIndex {
 }
 
 /**
- * Save graph and metadata to .codemap/ directory.
+ * Save graph and metadata to .recon/ directory.
  * Creates directory if it doesn't exist.
  */
 export async function saveIndex(
@@ -28,7 +28,7 @@ export async function saveIndex(
   graph: KnowledgeGraph,
   meta: IndexMeta,
 ): Promise<void> {
-  const dir = join(projectRoot, CODEMAP_DIR);
+  const dir = join(projectRoot, RECON_DIR);
 
   if (!existsSync(dir)) {
     await mkdir(dir, { recursive: true });
@@ -43,11 +43,11 @@ export async function saveIndex(
 }
 
 /**
- * Load graph and metadata from .codemap/ directory.
+ * Load graph and metadata from .recon/ directory.
  * Returns null if no index exists.
  */
 export async function loadIndex(projectRoot: string): Promise<StoredIndex | null> {
-  const dir = join(projectRoot, CODEMAP_DIR);
+  const dir = join(projectRoot, RECON_DIR);
 
   if (!existsSync(dir)) return null;
 
