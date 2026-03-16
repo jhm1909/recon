@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recon — Code Intelligence Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>&#x1f52c;</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="m20 20-3.5-3.5"/>
+          <circle cx="11" cy="11" r="3" stroke-dasharray="2 2"/>
+        </svg>
+        <span class="logo-text">Recon</span>
+      </div>
+    </div>
+    <div class="header-center">
+      <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+        <input type="text" id="searchInput" placeholder="Search symbols..." autocomplete="off" spellcheck="false" />
+        <kbd class="search-kbd">/</kbd>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="stats-pills" id="headerStats"></div>
+    </div>
+  </header>
+
+  <!-- ── Main Layout ────────────────────────────────────── -->
+  <main class="layout">
+
+    <!-- Sidebar: Packages -->
+    <aside class="sidebar glass-panel">
+      <div class="panel-header">
+        <h2>Packages</h2>
+        <span class="badge" id="pkgCount">0</span>
+      </div>
+      <div class="panel-body scrollable" id="packageList">
+        <div class="placeholder-text">Loading...</div>
+      </div>
+    </aside>
+
+    <!-- Graph Visualization -->
+    <section class="graph-area">
+      <div class="graph-container" id="graphContainer">
+        <div class="loading-overlay" id="loadingOverlay">
+          <div class="spinner"></div>
+          <p>Loading graph...</p>
+        </div>
+      </div>
+      <div class="graph-toolbar">
+        <div class="toolbar-group">
+          <select id="typeFilter" class="toolbar-select" title="Filter by type">
+            <option value="">All Types</option>
+            <option value="Package">Package</option>
+            <option value="Module">Module</option>
+            <option value="Function">Function</option>
+            <option value="Method">Method</option>
+            <option value="Struct">Struct</option>
+            <option value="Interface">Interface</option>
+            <option value="Class">Class</option>
+            <option value="Component">Component</option>
+            <option value="Type">Type</option>
+            <option value="Enum">Enum</option>
+            <option value="Trait">Trait</option>
+          </select>
+          <select id="limitSelect" class="toolbar-select" title="Max nodes">
+            <option value="100">100 nodes</option>
+            <option value="300" selected>300 nodes</option>
+            <option value="500">500 nodes</option>
+            <option value="1000">1000 nodes</option>
+          </select>
+        </div>
+        <div class="toolbar-group">
+          <button id="fitBtn" class="toolbar-btn" title="Fit to view">Fit</button>
+          <button id="physicsBtn" class="toolbar-btn active" title="Toggle physics simulation">Physics</button>
+          <button id="refreshBtn" class="toolbar-btn" title="Reload graph">Reload</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Details Panel -->
+    <aside class="details-panel glass-panel">
+      <div class="panel-header">
+        <h2 id="detailsTitle">Details</h2>
+      </div>
+      <div class="panel-body scrollable" id="detailsContent">
+        <div class="placeholder-msg">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-7.07-2.83 2.83M9.76 14.24l-2.83 2.83m0-10.14 2.83 2.83m4.48 4.48 2.83 2.83"/>
+          </svg>
+          <p>Click a node to inspect</p>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────── -->
+  <footer class="footer">
+    <span id="statusText">Connecting...</span>
+    <span class="footer-brand">Recon v5</span>
+  </footer>
+
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

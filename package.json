@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/dashboard dist/dashboard",
     "dev": "tsc --watch",
     "test": "vitest run",
     "prepare": "npm run build"
