@@ -12,7 +12,7 @@ import { analyzeGoPackages, runGoList, getModulePath, analyzeGoSymbols } from '.
 import { analyzeTypeScript } from '../analyzers/ts-analyzer.js';
 import { buildCrossLanguageEdges, extractGoRoutes } from '../analyzers/cross-language.js';
 import type { APIRoute } from '../analyzers/cross-language.js';
-import { saveIndex, saveSearchIndex, loadIndex } from '../storage/store.js';
+import { saveIndex, saveSearchIndex, loadIndex, listRepos, loadAllRepos, defaultRepoName } from '../storage/store.js';
 import type { IndexMeta } from '../storage/types.js';
 import { startServer } from '../mcp/server.js';
 import { BM25Index } from '../search/bm25.js';
@@ -47,14 +47,15 @@ function getGitInfo(cwd: string): { commit: string; branch: string } {
 
 // ??? index command ???????????????????????????????????????????????
 
-export async function indexCommand(options: { force?: boolean }): Promise<void> {
+export async function indexCommand(options: { force?: boolean; repo?: string }): Promise<void> {
   const startTime = performance.now();
   const projectRoot = findProjectRoot();
+  const repoName = options.repo;
 
-  console.log(`[recon] Indexing from ${projectRoot}...`);
+  console.log(`[recon] Indexing from ${projectRoot}${repoName ? ` (repo: ${repoName})` : ''}...`);
 
   // Load previous index for incremental comparison
-  const previousIndex = options.force ? null : await loadIndex(projectRoot);
+  const previousIndex = options.force ? null : await loadIndex(projectRoot, repoName);
   const previousHashes = previousIndex?.meta.fileHashes;
 
   if (previousIndex && !options.force) {
@@ -257,12 +258,19 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
   };
 
   // Save
-  await saveIndex(projectRoot, graph, meta);
+  // Stamp repo name on all nodes if multi-repo
+  if (repoName) {
+    for (const node of graph.nodes.values()) {
+      node.repo = repoName;
+    }
+  }
+
+  await saveIndex(projectRoot, graph, meta, repoName);
 
   // Build and save BM25 search index
   console.log('[recon] Building search index...');
   const searchIndex = BM25Index.buildFromGraph(graph);
-  await saveSearchIndex(projectRoot, searchIndex);
+  await saveSearchIndex(projectRoot, searchIndex, repoName);
   console.log(`[recon] Search index: ${searchIndex.documentCount} documents`);
 
   const summary = [
@@ -300,26 +308,50 @@ function countPreviousSymbols(
 
 // ??? serve command ???????????????????????????????????????????????
 
-export async function serveCommand(): Promise<void> {
+export async function serveCommand(options?: { repo?: string }): Promise<void> {
   const projectRoot = findProjectRoot();
-  const stored = await loadIndex(projectRoot);
+  const repoName = options?.repo;
 
-  if (!stored) {
-    console.error("[recon] No index found. Run 'npx recon index' first.");
-    process.exit(1);
+  let graph: KnowledgeGraph;
+
+  if (repoName) {
+    // Load specific repo
+    const stored = await loadIndex(projectRoot, repoName);
+    if (!stored) {
+      console.error(`[recon] No index found for repo '${repoName}'. Run 'npx recon index --repo ${repoName}' first.`);
+      process.exit(1);
+    }
+    graph = stored.graph;
+    console.error(`[recon] Loaded repo '${repoName}': ${graph.nodeCount} nodes, ${graph.relationshipCount} relationships`);
+  } else {
+    // Try loading all repos (merged), fall back to legacy single index
+    const allRepos = await loadAllRepos(projectRoot);
+    if (allRepos) {
+      graph = allRepos.graph;
+      const repoNames = allRepos.repos.map(r => r.name).join(', ');
+      console.error(`[recon] Loaded ${allRepos.repos.length} repo(s) [${repoNames}]: ${graph.nodeCount} nodes, ${graph.relationshipCount} relationships`);
+    } else {
+      const stored = await loadIndex(projectRoot);
+      if (!stored) {
+        console.error("[recon] No index found. Run 'npx recon index' first.");
+        process.exit(1);
+      }
+      graph = stored.graph;
+      console.error(`[recon] Loaded index: ${graph.nodeCount} nodes, ${graph.relationshipCount} relationships`);
+    }
   }
 
-  console.error(`[recon] Loaded index: ${stored.graph.nodeCount} nodes, ${stored.graph.relationshipCount} relationships`);
   console.error('[recon] MCP server starting on stdio...');
 
-  await startServer(stored.graph);
+  await startServer(graph, projectRoot);
 }
 
 // ??? status command ??????????????????????????????????????????????
 
-export async function statusCommand(): Promise<void> {
+export async function statusCommand(options?: { repo?: string }): Promise<void> {
   const projectRoot = findProjectRoot();
-  const stored = await loadIndex(projectRoot);
+  const repoName = options?.repo;
+  const stored = await loadIndex(projectRoot, repoName);
 
   if (!stored) {
     console.log('[recon] No index found. Run "npx recon index" first.');
@@ -351,15 +383,26 @@ export async function statusCommand(): Promise<void> {
 
 // ??? clean command ???????????????????????????????????????????????
 
-export function cleanCommand(): void {
+export function cleanCommand(options?: { repo?: string }): void {
   const projectRoot = findProjectRoot();
-  const reconDir = join(projectRoot, '.recon');
+  const repoName = options?.repo;
 
-  if (existsSync(reconDir)) {
-    rmSync(reconDir, { recursive: true, force: true });
-    console.log('[recon] Index cleaned.');
+  if (repoName) {
+    const repoDir = join(projectRoot, '.recon', 'repos', repoName);
+    if (existsSync(repoDir)) {
+      rmSync(repoDir, { recursive: true, force: true });
+      console.log(`[recon] Index for repo '${repoName}' cleaned.`);
+    } else {
+      console.log(`[recon] No index found for repo '${repoName}'.`);
+    }
   } else {
-    console.log('[recon] No index to clean.');
+    const reconDir = join(projectRoot, '.recon');
+    if (existsSync(reconDir)) {
+      rmSync(reconDir, { recursive: true, force: true });
+      console.log('[recon] Index cleaned.');
+    } else {
+      console.log('[recon] No index to clean.');
+    }
   }
 }
 

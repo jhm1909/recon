@@ -1,8 +1,7 @@
-﻿/**
+/**
  * MCP Tool Definitions
  *
  * Defines tools exposed to AI agents via MCP protocol.
- * Defines the 6 tools exposed via MCP protocol.
  */
 
 export interface ToolDefinition {
@@ -21,6 +20,11 @@ export interface ToolDefinition {
   };
 }
 
+const REPO_PROPERTY = {
+  type: 'string',
+  description: 'Filter by repo name (multi-repo). Omit to search across all indexed repos.',
+} as const;
+
 export const RECON_TOOLS: ToolDefinition[] = [
   {
     name: 'recon_packages',
@@ -37,6 +41,7 @@ AFTER THIS: Use recon_impact() to check blast radius before editing a package.`,
           enum: ['go', 'typescript', 'all'],
           default: 'all',
         },
+        repo: REPO_PROPERTY,
       },
       required: [],
     },
@@ -45,7 +50,7 @@ AFTER THIS: Use recon_impact() to check blast radius before editing a package.`,
     name: 'recon_impact',
     description: `Analyze the blast radius of changing a code symbol. Returns affected symbols grouped by depth, plus risk assessment.
 
-WHEN TO USE: Before making code changes ??especially refactoring, renaming, or modifying shared code. Shows what would break.
+WHEN TO USE: Before making code changes — especially refactoring, renaming, or modifying shared code. Shows what would break.
 AFTER THIS: Review d=1 items (WILL BREAK). Use recon_context({name}) on high-risk symbols.
 
 Depth groups:
@@ -90,6 +95,7 @@ Risk levels: LOW (0-2 d1), MEDIUM (3-9), HIGH (10-19), CRITICAL (20+ or cross-ap
           type: 'string',
           description: 'Filter target by file path (substring match) to disambiguate symbols with same name',
         },
+        repo: REPO_PROPERTY,
       },
       required: ['target', 'direction'],
     },
@@ -116,6 +122,7 @@ AFTER THIS: Use recon_impact() if planning changes.`,
           description: 'Include symbol source code in response (default: false)',
           default: false,
         },
+        repo: REPO_PROPERTY,
       },
       required: ['name'],
     },
@@ -124,8 +131,8 @@ AFTER THIS: Use recon_impact() if planning changes.`,
     name: 'recon_query',
     description: `Search the knowledge graph for symbols by name or pattern. Use when you need to find a function, struct, or component by name.
 
-WHEN TO USE: When you need to find a function, struct, or component by name. Complements grep ??returns structured results with dependency info.
-AFTER THIS: Use recon_context({name}) for 360째 view of a result.`,
+WHEN TO USE: When you need to find a function, struct, or component by name. Complements grep — returns structured results with dependency info.
+AFTER THIS: Use recon_context({name}) for 360° view of a result.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -152,6 +159,7 @@ AFTER THIS: Use recon_context({name}) for 360째 view of a result.`,
           description: 'Max results to return (default: 20)',
           default: 20,
         },
+        repo: REPO_PROPERTY,
       },
       required: ['query'],
     },
@@ -160,7 +168,7 @@ AFTER THIS: Use recon_context({name}) for 360째 view of a result.`,
     name: 'recon_detect_changes',
     description: `Analyze uncommitted git changes and find affected symbols and their dependents. Maps git diff hunks to indexed symbols, then traces impact through the dependency graph.
 
-WHEN TO USE: Before committing ??to understand what your changes affect. Pre-commit review, PR preparation.
+WHEN TO USE: Before committing — to understand what your changes affect. Pre-commit review, PR preparation.
 AFTER THIS: Review affected symbols. Use recon_context() on high-risk items.`,
     inputSchema: {
       type: 'object',
@@ -176,13 +184,14 @@ AFTER THIS: Review affected symbols. Use recon_context() on high-risk items.`,
           description: 'Base branch/commit for "branch" scope (default: "main")',
           default: 'main',
         },
+        repo: REPO_PROPERTY,
       },
       required: [],
     },
   },
   {
     name: 'recon_api_map',
-    description: `Show the full API route map: HTTP endpoint ??Go handler ??TypeScript consumers. Cross-language traceability.
+    description: `Show the full API route map: HTTP endpoint → Go handler → TypeScript consumers. Cross-language traceability.
 
 WHEN TO USE: When you need to understand how frontend calls map to backend handlers, find which TS files call a specific API endpoint, or audit API coverage.
 AFTER THIS: Use recon_context({name}) on a specific handler for full dependency info.`,
@@ -202,6 +211,7 @@ AFTER THIS: Use recon_context({name}) on a specific handler for full dependency 
           type: 'string',
           description: 'Filter by handler name substring (e.g., "GetGuild")',
         },
+        repo: REPO_PROPERTY,
       },
       required: [],
     },
@@ -236,6 +246,7 @@ Each edit is tagged:
           description: 'Preview edits without applying (default: true)',
           default: true,
         },
+        repo: REPO_PROPERTY,
       },
       required: ['symbol_name', 'new_name'],
     },
@@ -256,7 +267,7 @@ NODE TYPES: Package, File, Function, Method, Struct, Interface, Module, Componen
 EDGE TYPES: CONTAINS, DEFINES, CALLS, IMPORTS, HAS_METHOD, IMPLEMENTS, USES_COMPONENT, CALLS_API, EXTENDS
 
 WHERE operators: =, <>, CONTAINS, STARTS WITH (all case-insensitive)
-NODE properties: id, type, name, file, startLine, endLine, language, package, exported
+NODE properties: id, type, name, file, startLine, endLine, language, package, exported, repo
 
 EXAMPLES:
 • Find all classes:
@@ -281,9 +292,21 @@ EXAMPLES:
           description: 'Max rows to return (default: 50)',
           default: 50,
         },
+        repo: REPO_PROPERTY,
       },
       required: ['query'],
     },
   },
-];
+  {
+    name: 'recon_list_repos',
+    description: `List all indexed repositories with their stats (node count, relationship count, index time, git info).
 
+WHEN TO USE: When working with multi-repo setups. Discover which repos are indexed and their sizes.
+AFTER THIS: Use any tool with repo parameter to filter by a specific repo.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+];

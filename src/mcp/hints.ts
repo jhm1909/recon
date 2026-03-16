@@ -40,6 +40,9 @@ export function getNextStepHint(
     case 'recon_query_graph':
       return '\n\n---\n**Next:** Use recon_context({name: "<symbol>"}) for 360° view of a result symbol, or refine your query with additional WHERE conditions.';
 
+    case 'recon_list_repos':
+      return '\n\n---\n**Next:** Use any tool with repo parameter to filter by a specific repo, e.g. recon_query({query: "...", repo: "<repo_name>"}).';
+
     default:
       return '';
   }

@@ -73,6 +73,7 @@ export interface Node {
   language: Language;
   package: string;
   exported: boolean;
+  repo?: string;            // Multi-repo: which repo this node belongs to
 
   // Go-specific (optional)
   receiver?: string;       // Method receiver type

@@ -12,6 +12,43 @@ import { BM25Index } from '../search/bm25.js';
 import { planRename, formatRenameResult } from './rename.js';
 import type { RenameResult } from './rename.js';
 import { executeQuery as executeCypherQuery, formatResultAsMarkdown } from '../query/index.js';
+import { listRepos } from '../storage/store.js';
+
+/**
+ * Filter a graph to only include nodes belonging to a specific repo.
+ * Returns a new graph with only matching nodes and their relationships.
+ */
+function filterGraphByRepo(graph: KnowledgeGraph, repo: string): KnowledgeGraph {
+  const filtered = new KnowledgeGraph();
+
+  for (const node of graph.nodes.values()) {
+    if (node.repo === repo) {
+      filtered.addNode(node);
+    }
+  }
+
+  for (const rel of graph.relationships.values()) {
+    if (filtered.getNode(rel.sourceId) && filtered.getNode(rel.targetId)) {
+      filtered.addRelationship(rel);
+    }
+  }
+
+  return filtered;
+}
+
+/**
+ * Apply repo filter if specified in args.
+ */
+function maybeFilterByRepo(
+  args: Record<string, unknown> | undefined,
+  graph: KnowledgeGraph,
+): KnowledgeGraph {
+  const repo = args?.repo as string | undefined;
+  if (repo) {
+    return filterGraphByRepo(graph, repo);
+  }
+  return graph;
+}
 
 /**
  * Handle a tool call and return formatted text result.
@@ -20,6 +57,7 @@ export async function handleToolCall(
   name: string,
   args: Record<string, unknown> | undefined,
   graph: KnowledgeGraph,
+  projectRoot?: string,
 ): Promise<string> {
   switch (name) {
     case 'recon_packages':
@@ -46,6 +84,9 @@ export async function handleToolCall(
     case 'recon_query_graph':
       return handleQueryGraph(args, graph);
 
+    case 'recon_list_repos':
+      return handleListRepos(projectRoot);
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -58,6 +99,7 @@ function handlePackages(
   graph: KnowledgeGraph,
 ): string {
   const langFilter = (args?.language as string) || 'all';
+  graph = maybeFilterByRepo(args, graph);
 
   // Collect package nodes
   const packages: Node[] = [];
@@ -129,6 +171,8 @@ function handleImpact(
   if (!direction || !['upstream', 'downstream'].includes(direction)) {
     throw new Error("Invalid direction. Use 'upstream' or 'downstream'.");
   }
+
+  graph = maybeFilterByRepo(args, graph);
 
   const maxDepth = (args?.maxDepth as number) || 3;
   const includeTests = (args?.includeTests as boolean) || false;
@@ -285,6 +329,8 @@ function handleContext(
 
   if (!name) throw new Error("Symbol 'name' is required.");
 
+  graph = maybeFilterByRepo(args, graph);
+
   let matches = graph.findByName(name);
 
   if (fileFilter) {
@@ -394,6 +440,8 @@ function handleQuery(
   const limit = (args?.limit as number) || 20;
 
   if (!rawQuery) throw new Error("'query' parameter is required.");
+
+  graph = maybeFilterByRepo(args, graph);
 
   const queryLower = rawQuery.toLowerCase();
 
@@ -565,6 +613,8 @@ function handleDetectChanges(
   const scope = (args?.scope as string) || 'all';
   const base = (args?.base as string) || 'main';
   const projectRoot = findProjectRoot();
+
+  graph = maybeFilterByRepo(args, graph);
 
   // 1. Get changed files and diff hunks
   const changedFiles = getChangedFiles(projectRoot, scope, base);
@@ -779,6 +829,8 @@ function handleApiMap(
   const patternFilter = args?.pattern as string | undefined;
   const handlerFilter = args?.handler as string | undefined;
 
+  graph = maybeFilterByRepo(args, graph);
+
   // Collect all CALLS_API edges
   const apiEdges: Array<{
     rel: Relationship;
@@ -951,6 +1003,8 @@ function handleRename(
   if (!symbolName) throw new Error("'symbol_name' is required.");
   if (!newName) throw new Error("'new_name' is required.");
 
+  graph = maybeFilterByRepo(args, graph);
+
   const result = planRename(graph, symbolName, newName, fileFilter, dryRun);
 
   // If planRename returned a disambiguation string, return it directly
@@ -972,6 +1026,8 @@ function handleQueryGraph(
 
   if (!queryStr) throw new Error("'query' parameter is required.");
 
+  graph = maybeFilterByRepo(args, graph);
+
   const result = executeCypherQuery(queryStr, graph, limit);
 
   const lines: string[] = [
@@ -986,3 +1042,40 @@ function handleQueryGraph(
   return lines.join('\n');
 }
 
+// ─── recon_list_repos ────────────────────────────────────────────
+
+async function handleListRepos(projectRoot?: string): Promise<string> {
+  if (!projectRoot) {
+    projectRoot = findProjectRoot();
+  }
+
+  const repos = await listRepos(projectRoot);
+
+  if (repos.length === 0) {
+    return [
+      '# Indexed Repos',
+      '',
+      '_No indexed repos found. Run `npx recon index` to index the current codebase._',
+    ].join('\n');
+  }
+
+  const lines: string[] = [
+    '# Indexed Repos',
+    '',
+    `**Total:** ${repos.length} repo(s)`,
+    '',
+  ];
+
+  for (const repo of repos) {
+    lines.push(`## ${repo.name}`);
+    lines.push(`  Nodes: ${repo.nodeCount}`);
+    lines.push(`  Relationships: ${repo.relationshipCount}`);
+    lines.push(`  Indexed at: ${repo.meta.indexedAt}`);
+    lines.push(`  Git: ${repo.meta.gitBranch}@${repo.meta.gitCommit}`);
+    lines.push(`  Go packages: ${repo.meta.stats.goPackages}, Go symbols: ${repo.meta.stats.goSymbols}`);
+    lines.push(`  TS modules: ${repo.meta.stats.tsModules}, TS symbols: ${repo.meta.stats.tsSymbols}`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}

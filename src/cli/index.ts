@@ -21,6 +21,7 @@ program
   .command('index')
   .description('Index the codebase (Go packages + TypeScript modules)')
   .option('--force', 'Force full re-index (skip incremental)')
+  .option('--repo <name>', 'Store index under a named repo (for multi-repo support)')
   .action(async (options) => {
     await indexCommand(options);
   });
@@ -28,22 +29,25 @@ program
 program
   .command('serve')
   .description('Start MCP server on stdio')
-  .action(async () => {
-    await serveCommand();
+  .option('--repo <name>', 'Serve only a specific repo index')
+  .action(async (options) => {
+    await serveCommand(options);
   });
 
 program
   .command('status')
   .description('Show index status')
-  .action(async () => {
-    await statusCommand();
+  .option('--repo <name>', 'Show status for a specific repo index')
+  .action(async (options) => {
+    await statusCommand(options);
   });
 
 program
   .command('clean')
   .description('Delete the .recon/ index directory')
-  .action(() => {
-    cleanCommand();
+  .option('--repo <name>', 'Clean only a specific repo index')
+  .action((options) => {
+    cleanCommand(options);
   });
 
 program.parse();

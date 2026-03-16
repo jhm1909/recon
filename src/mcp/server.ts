@@ -28,7 +28,7 @@ const VERSION = '1.0.0';
 /**
  * Create a configured MCP Server with all handlers registered.
  */
-export function createServer(graph: KnowledgeGraph): Server {
+export function createServer(graph: KnowledgeGraph, projectRoot?: string): Server {
   const server = new Server(
     { name: 'recon', version: VERSION },
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
@@ -96,6 +96,7 @@ export function createServer(graph: KnowledgeGraph): Server {
         name,
         args as Record<string, unknown> | undefined,
         graph,
+        projectRoot,
       );
       const hint = getNextStepHint(name, args as Record<string, unknown>);
 
@@ -117,8 +118,8 @@ export function createServer(graph: KnowledgeGraph): Server {
 /**
  * Start the MCP server on stdio transport.
  */
-export async function startServer(graph: KnowledgeGraph): Promise<void> {
-  const server = createServer(graph);
+export async function startServer(graph: KnowledgeGraph, projectRoot?: string): Promise<void> {
+  const server = createServer(graph, projectRoot);
   const transport = new StdioServerTransport();
 
   let shuttingDown = false;
