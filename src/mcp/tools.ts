@@ -136,7 +136,7 @@ AFTER THIS: Use recon_context({name}) for 360째 view of a result.`,
         type: {
           type: 'string',
           description: 'Filter by node type',
-          enum: ['Function', 'Method', 'Struct', 'Interface', 'Component', 'Type', 'Package'],
+          enum: ['Function', 'Method', 'Struct', 'Interface', 'Component', 'Type', 'Package', 'Class', 'Enum', 'Trait'],
         },
         package: {
           type: 'string',
@@ -145,7 +145,7 @@ AFTER THIS: Use recon_context({name}) for 360째 view of a result.`,
         language: {
           type: 'string',
           description: 'Filter by language',
-          enum: ['go', 'typescript'],
+          enum: ['go', 'typescript', 'python', 'rust', 'java', 'c', 'cpp'],
         },
         limit: {
           type: 'number',

@@ -3,8 +3,13 @@
  *
  * Core types for the Recon knowledge graph.
  * Node ID conventions use namespaced prefixes to avoid collisions:
- *   Go:  go:pkg:, go:file:, go:func:, go:method:, go:struct:, go:iface:
- *   TS:  ts:mod:, ts:file:, ts:comp:, ts:func:, ts:type:
+ *   Go:     go:pkg:, go:file:, go:func:, go:method:, go:struct:, go:iface:
+ *   TS:     ts:mod:, ts:file:, ts:comp:, ts:func:, ts:type:
+ *   Python: py:file:, py:func:, py:class:, py:method:
+ *   Rust:   rs:file:, rs:func:, rs:struct:, rs:trait:, rs:impl:, rs:enum:
+ *   Java:   java:file:, java:func:, java:class:, java:iface:, java:enum:
+ *   C:      c:file:, c:func:, c:struct:, c:enum:
+ *   C++:    cpp:file:, cpp:func:, cpp:class:, cpp:struct:, cpp:enum:
  */
 
 // ─── Enums ──────────────────────────────────────────────────────
@@ -19,6 +24,9 @@ export enum NodeType {
   Module = 'Module',
   Component = 'Component',
   Type = 'Type',
+  Class = 'Class',
+  Enum = 'Enum',
+  Trait = 'Trait',
 }
 
 export enum RelationshipType {
@@ -26,15 +34,21 @@ export enum RelationshipType {
   DEFINES = 'DEFINES',         // File → Symbol
   CALLS = 'CALLS',             // Function → Function
   IMPORTS = 'IMPORTS',         // Package → Package
-  HAS_METHOD = 'HAS_METHOD',  // Struct → Method
-  IMPLEMENTS = 'IMPLEMENTS',   // Struct → Interface
+  HAS_METHOD = 'HAS_METHOD',  // Struct/Class → Method
+  IMPLEMENTS = 'IMPLEMENTS',   // Struct → Interface / Class → Trait
   USES_COMPONENT = 'USES_COMPONENT', // Component → Component
   CALLS_API = 'CALLS_API',    // TS Function → Go Function (cross-language)
+  EXTENDS = 'EXTENDS',        // Class → Class (inheritance)
 }
 
 export enum Language {
   Go = 'go',
   TypeScript = 'typescript',
+  Python = 'python',
+  Rust = 'rust',
+  Java = 'java',
+  C = 'c',
+  Cpp = 'cpp',
 }
 
 // ─── Node ───────────────────────────────────────────────────────

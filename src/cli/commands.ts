@@ -16,6 +16,8 @@ import { saveIndex, saveSearchIndex, loadIndex } from '../storage/store.js';
 import type { IndexMeta } from '../storage/types.js';
 import { startServer } from '../mcp/server.js';
 import { BM25Index } from '../search/bm25.js';
+import { analyzeTreeSitter } from '../analyzers/tree-sitter/index.js';
+import { getAvailableLanguages } from '../analyzers/tree-sitter/index.js';
 
 /**
  * Find project root by walking up to find go.mod.
@@ -172,6 +174,37 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
     }
   }
 
+  // Tree-sitter analysis: Python, Rust, Java, C, C++
+  const tsitterLangs = getAvailableLanguages();
+  let tsitterSymbols = 0;
+  let tsitterFiles = 0;
+  let tsitterHashes: Record<string, string> = {};
+  if (tsitterLangs.length > 0) {
+    console.log(`[recon] Analyzing with tree-sitter (${tsitterLangs.join(', ')})...`);
+    const tsitterResult = analyzeTreeSitter(projectRoot, previousHashes);
+
+    for (const node of tsitterResult.result.nodes) {
+      graph.addNode(node);
+    }
+    for (const rel of tsitterResult.result.relationships) {
+      graph.addRelationship(rel);
+    }
+
+    tsitterSymbols = tsitterResult.stats.symbols;
+    tsitterFiles = tsitterResult.stats.files;
+    tsitterHashes = tsitterResult.fileHashes;
+
+    if (tsitterResult.stats.files > 0) {
+      const langBreakdown = Object.entries(tsitterResult.stats.languages)
+        .map(([l, c]) => `${l}: ${c}`)
+        .join(', ');
+      console.log(
+        `[recon] Tree-sitter: ${tsitterResult.stats.files} files, ` +
+        `${tsitterResult.stats.symbols} symbols (${langBreakdown})`,
+      );
+    }
+  }
+
   // Cross-language analysis: link TS API calls to Go handlers
   console.log('[recon] Analyzing cross-language API links...');
   const existingNodeIds = new Set<string>();
@@ -215,7 +248,7 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
       relationships: graph.relationshipCount,
       indexTimeMs: elapsed,
     },
-    fileHashes: { ...symbolResult.fileHashes, ...tsResult.fileHashes },
+    fileHashes: { ...symbolResult.fileHashes, ...tsResult.fileHashes, ...tsitterHashes },
     apiRoutes: crossLangResult.routes.map(r => ({
       method: r.method,
       pattern: r.pattern,
@@ -232,11 +265,17 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
   await saveSearchIndex(projectRoot, searchIndex);
   console.log(`[recon] Search index: ${searchIndex.documentCount} documents`);
 
-  console.log(
-    `[recon] Indexed ${goPackages} Go packages, ${goSymbols} Go symbols, ` +
-    `${tsFiles} TS files, ${tsSymbols} TS symbols, ` +
-    `${graph.relationshipCount} relationships in ${elapsed}ms`,
-  );
+  const summary = [
+    `${goPackages} Go packages`,
+    `${goSymbols} Go symbols`,
+    `${tsFiles} TS files`,
+    `${tsSymbols} TS symbols`,
+  ];
+  if (tsitterSymbols > 0) {
+    summary.push(`${tsitterFiles} tree-sitter files`, `${tsitterSymbols} tree-sitter symbols`);
+  }
+  summary.push(`${graph.relationshipCount} relationships in ${elapsed}ms`);
+  console.log(`[recon] Indexed ${summary.join(', ')}`);
   console.log(`[recon] Saved to ${join(projectRoot, '.recon/')}`);
 }
 
