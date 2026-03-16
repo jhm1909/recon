@@ -9,6 +9,8 @@ import { KnowledgeGraph } from '../graph/graph.js';
 import { NodeType, RelationshipType, Language } from '../graph/types.js';
 import type { Node, Relationship } from '../graph/types.js';
 import { BM25Index } from '../search/bm25.js';
+import { planRename, formatRenameResult } from './rename.js';
+import type { RenameResult } from './rename.js';
 
 /**
  * Handle a tool call and return formatted text result.
@@ -36,6 +38,9 @@ export async function handleToolCall(
 
     case 'recon_api_map':
       return handleApiMap(args, graph);
+
+    case 'recon_rename':
+      return handleRename(args, graph);
 
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -926,5 +931,29 @@ function refFromRel(
 
 function isTestFile(file: string): boolean {
   return file.endsWith('_test.go') || file.endsWith('.test.ts') || file.endsWith('.test.tsx') || file.endsWith('.spec.ts') || file.endsWith('.spec.tsx');
+}
+
+// ─── recon_rename ───────────────────────────────────────────────
+
+function handleRename(
+  args: Record<string, unknown> | undefined,
+  graph: KnowledgeGraph,
+): string {
+  const symbolName = args?.symbol_name as string;
+  const newName = args?.new_name as string;
+  const fileFilter = args?.file as string | undefined;
+  const dryRun = (args?.dry_run as boolean) ?? true;
+
+  if (!symbolName) throw new Error("'symbol_name' is required.");
+  if (!newName) throw new Error("'new_name' is required.");
+
+  const result = planRename(graph, symbolName, newName, fileFilter, dryRun);
+
+  // If planRename returned a disambiguation string, return it directly
+  if (typeof result === 'string') {
+    return result;
+  }
+
+  return formatRenameResult(result);
 }
 

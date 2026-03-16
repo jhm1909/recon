@@ -29,6 +29,14 @@ export function getNextStepHint(
     case 'recon_api_map':
       return '\n\n---\n**Next:** Use recon_context({name: "<handler>"}) on a handler for full dependency info, or recon_impact({target: "<handler>", direction: "upstream"}) to check blast radius.';
 
+    case 'recon_rename': {
+      const dryRun = args?.dry_run !== false;
+      if (dryRun) {
+        return '\n\n---\n**Next:** Review the edit plan. If it looks correct, run again with dry_run: false to apply. Then run recon_detect_changes() to verify.';
+      }
+      return '\n\n---\n**Next:** Run recon_detect_changes() to verify the rename only affected expected symbols.';
+    }
+
     default:
       return '';
   }

@@ -206,5 +206,39 @@ AFTER THIS: Use recon_context({name}) on a specific handler for full dependency 
       required: [],
     },
   },
+  {
+    name: 'recon_rename',
+    description: `Multi-file coordinated rename using the knowledge graph. Finds all references via graph relationships (callers, importers, component users) and generates an edit plan with confidence tags.
+
+WHEN TO USE: Renaming a function, struct, component, or method across the codebase. Safer than find-and-replace because it understands the call graph.
+AFTER THIS: Review the edit plan. Run with dry_run: false to apply. Then run recon_detect_changes() to verify.
+
+Each edit is tagged:
+- "graph": found via knowledge graph relationship (high confidence, safe to accept)
+- "text_search": found via name matching (lower confidence, review carefully)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        symbol_name: {
+          type: 'string',
+          description: 'Current name of the symbol to rename',
+        },
+        new_name: {
+          type: 'string',
+          description: 'The new name for the symbol',
+        },
+        file: {
+          type: 'string',
+          description: 'File path substring to disambiguate when multiple symbols share a name',
+        },
+        dry_run: {
+          type: 'boolean',
+          description: 'Preview edits without applying (default: true)',
+          default: true,
+        },
+      },
+      required: ['symbol_name', 'new_name'],
+    },
+  },
 ];
 
