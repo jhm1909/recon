@@ -3,3 +3,8 @@ dist/
 .codemap/
 *.tsbuildinfo
 *.exe
+.agent/
+.claude/
+.cursor/
+.gemini/
+.reference/
