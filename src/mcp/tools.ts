@@ -240,5 +240,50 @@ Each edit is tagged:
       required: ['symbol_name', 'new_name'],
     },
   },
+  {
+    name: 'recon_query_graph',
+    description: `Execute a simplified Cypher query against the Recon knowledge graph. Returns results as a markdown table.
+
+WHEN TO USE: Complex structural queries that recon_query can't answer — e.g., "find all structs with methods", "find all callers of functions in package X", "list classes that extend another class".
+AFTER THIS: Use recon_context({name}) on result symbols for deeper context.
+
+SUPPORTED SYNTAX:
+  MATCH (n:Type) WHERE n.name = 'X' RETURN n
+  MATCH (a)-[:EDGE_TYPE]->(b) WHERE a.name = 'X' RETURN b.name, b.file
+  MATCH (s:Struct)-[:HAS_METHOD]->(m:Method) RETURN s.name, m.name
+
+NODE TYPES: Package, File, Function, Method, Struct, Interface, Module, Component, Type, Class, Enum, Trait
+EDGE TYPES: CONTAINS, DEFINES, CALLS, IMPORTS, HAS_METHOD, IMPLEMENTS, USES_COMPONENT, CALLS_API, EXTENDS
+
+WHERE operators: =, <>, CONTAINS, STARTS WITH (all case-insensitive)
+NODE properties: id, type, name, file, startLine, endLine, language, package, exported
+
+EXAMPLES:
+• Find all classes:
+  MATCH (c:Class) RETURN c.name, c.file
+• Find callers of a function:
+  MATCH (a)-[:CALLS]->(b:Function) WHERE b.name = 'main' RETURN a.name, a.file
+• Find methods of a struct:
+  MATCH (s:Struct)-[:HAS_METHOD]->(m:Method) WHERE s.name = 'Config' RETURN m.name, m.file
+• Find class inheritance:
+  MATCH (child:Class)-[:EXTENDS]->(parent:Class) RETURN child.name, parent.name
+• Find exported functions in a package:
+  MATCH (f:Function) WHERE f.package CONTAINS 'auth' AND f.exported = 'true' RETURN f.name, f.file`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Simplified Cypher query (MATCH...WHERE...RETURN...LIMIT)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max rows to return (default: 50)',
+          default: 50,
+        },
+      },
+      required: ['query'],
+    },
+  },
 ];
 

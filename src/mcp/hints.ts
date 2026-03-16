@@ -37,6 +37,9 @@ export function getNextStepHint(
       return '\n\n---\n**Next:** Run recon_detect_changes() to verify the rename only affected expected symbols.';
     }
 
+    case 'recon_query_graph':
+      return '\n\n---\n**Next:** Use recon_context({name: "<symbol>"}) for 360° view of a result symbol, or refine your query with additional WHERE conditions.';
+
     default:
       return '';
   }

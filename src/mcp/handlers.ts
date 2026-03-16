@@ -11,6 +11,7 @@ import type { Node, Relationship } from '../graph/types.js';
 import { BM25Index } from '../search/bm25.js';
 import { planRename, formatRenameResult } from './rename.js';
 import type { RenameResult } from './rename.js';
+import { executeQuery as executeCypherQuery, formatResultAsMarkdown } from '../query/index.js';
 
 /**
  * Handle a tool call and return formatted text result.
@@ -41,6 +42,9 @@ export async function handleToolCall(
 
     case 'recon_rename':
       return handleRename(args, graph);
+
+    case 'recon_query_graph':
+      return handleQueryGraph(args, graph);
 
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -955,5 +959,30 @@ function handleRename(
   }
 
   return formatRenameResult(result);
+}
+
+// ─── recon_query_graph ──────────────────────────────────────────
+
+function handleQueryGraph(
+  args: Record<string, unknown> | undefined,
+  graph: KnowledgeGraph,
+): string {
+  const queryStr = args?.query as string;
+  const limit = (args?.limit as number) || 50;
+
+  if (!queryStr) throw new Error("'query' parameter is required.");
+
+  const result = executeCypherQuery(queryStr, graph, limit);
+
+  const lines: string[] = [
+    `# Graph Query`,
+    '',
+    `**Query:** \`${queryStr}\``,
+    `**Results:** ${result.rowCount}${result.truncated ? ` (truncated at ${limit})` : ''}`,
+    '',
+    formatResultAsMarkdown(result),
+  ];
+
+  return lines.join('\n');
 }
 
