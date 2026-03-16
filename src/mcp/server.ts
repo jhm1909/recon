@@ -9,11 +9,19 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ListResourceTemplatesRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { KnowledgeGraph } from '../graph/graph.js';
 import { RECON_TOOLS } from './tools.js';
 import { handleToolCall } from './handlers.js';
 import { getNextStepHint } from './hints.js';
+import {
+  getResourceDefinitions,
+  getResourceTemplates,
+  readResource,
+} from './resources.js';
 
 const VERSION = '1.0.0';
 
@@ -23,8 +31,50 @@ const VERSION = '1.0.0';
 export function createServer(graph: KnowledgeGraph): Server {
   const server = new Server(
     { name: 'recon', version: VERSION },
-    { capabilities: { tools: {}, prompts: {} } },
+    { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
+
+  // ─── ListResources ────────────────────────────────────────────
+
+  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    resources: getResourceDefinitions().map((r) => ({
+      uri: r.uri,
+      name: r.name,
+      description: r.description,
+      mimeType: r.mimeType,
+    })),
+  }));
+
+  // ─── ListResourceTemplates ───────────────────────────────────
+
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+    resourceTemplates: getResourceTemplates().map((t) => ({
+      uriTemplate: t.uriTemplate,
+      name: t.name,
+      description: t.description,
+      mimeType: t.mimeType,
+    })),
+  }));
+
+  // ─── ReadResource ────────────────────────────────────────────
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const { uri } = request.params;
+    try {
+      const content = readResource(uri, graph);
+      return {
+        contents: [{ uri, mimeType: 'text/yaml', text: content }],
+      };
+    } catch (err) {
+      return {
+        contents: [{
+          uri,
+          mimeType: 'text/plain',
+          text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+        }],
+      };
+    }
+  });
 
   // ─── ListTools ──────────────────────────────────────────────
 
