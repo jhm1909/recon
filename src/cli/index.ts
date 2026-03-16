@@ -29,8 +29,10 @@ program
 
 program
   .command('serve')
-  .description('Start MCP server on stdio')
+  .description('Start MCP server on stdio, or HTTP REST API with --http')
   .option('--repo <name>', 'Serve only a specific repo index')
+  .option('--http', 'Start HTTP REST API server instead of MCP stdio')
+  .option('--port <number>', 'Port for HTTP server (default: 3100)', parseInt)
   .action(async (options) => {
     await serveCommand(options);
   });

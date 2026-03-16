@@ -359,7 +359,7 @@ function countPreviousSymbols(
 
 // ??? serve command ???????????????????????????????????????????????
 
-export async function serveCommand(options?: { repo?: string }): Promise<void> {
+export async function serveCommand(options?: { repo?: string; http?: boolean; port?: number }): Promise<void> {
   const projectRoot = findProjectRoot();
   const repoName = options?.repo;
 
@@ -399,9 +399,16 @@ export async function serveCommand(options?: { repo?: string }): Promise<void> {
     console.error(`[recon] Loaded ${vectorStore.size} embeddings (${vectorStore.dimensions}d)`);
   }
 
-  console.error('[recon] MCP server starting on stdio...');
-
-  await startServer(graph, projectRoot, vectorStore);
+  if (options?.http) {
+    const { startHttpServer } = await import('../server/http.js');
+    const port = options.port || 3100;
+    await startHttpServer({ port, graph, projectRoot, vectorStore });
+    // Keep process alive
+    await new Promise(() => {});
+  } else {
+    console.error('[recon] MCP server starting on stdio...');
+    await startServer(graph, projectRoot, vectorStore);
+  }
 }
 
 // ??? status command ??????????????????????????????????????????????
