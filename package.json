@@ -1,0 +1,24 @@
+{
+  "name": "recon",
+  "version": "1.0.0",
+  "description": "Lightweight code intelligence engine for AI agents. Dependency mapping, blast radius analysis, and call graph via MCP.",
+  "type": "module",
+  "bin": {
+    "codemap": "./bin/codemap"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
