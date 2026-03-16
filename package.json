@@ -18,6 +18,7 @@
     "build": "tsc && cp -r src/dashboard dist/dashboard",
     "dev": "tsc --watch",
     "test": "vitest run",
+    "review": "node dist/scripts/pr-review.js",
     "prepare": "npm run build"
   },
   "keywords": [
