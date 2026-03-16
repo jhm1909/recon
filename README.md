@@ -1,8 +1,8 @@
 # Recon
 
-Lightweight code intelligence engine for AI agents. Builds a knowledge graph of Go and TypeScript symbols, tracks cross-language API calls, and exposes 7 tools + 4 resources via [Model Context Protocol](https://modelcontextprotocol.io/).
+Lightweight code intelligence engine for AI agents. Builds a knowledge graph of **Go, TypeScript, Python, Rust, Java, C, and C++** codebases, tracks cross-language API calls, and exposes 8 tools + 4 resources via [Model Context Protocol](https://modelcontextprotocol.io/).
 
-> Give your AI agent architectural awareness — dependency mapping, blast radius analysis, safe renames, and call graph traversal without reading every file.
+> Give your AI agent architectural awareness — dependency mapping, blast radius analysis, safe renames, Cypher-like graph queries, and call graph traversal without reading every file.
 
 ---
 
@@ -10,8 +10,10 @@ Lightweight code intelligence engine for AI agents. Builds a knowledge graph of 
 
 AI coding agents are blind to architecture. They grep, they guess, they break things. Recon fixes this by indexing your codebase into a knowledge graph that agents can query through MCP:
 
+- **7 language support** — Go, TypeScript, Python, Rust, Java, C, C++ via tree-sitter + dedicated analyzers
 - **Blast radius before editing** — know what breaks before you touch it
 - **Graph-aware rename** — safe multi-file renames using the call graph, not find-and-replace
+- **Cypher-like graph queries** — structural queries with `MATCH`/`WHERE`/`RETURN` syntax
 - **BM25 ranked search** — keyword search with camelCase/snake_case tokenization and relevance scoring
 - **Cross-language tracing** — follow API calls from TypeScript frontend to Go backend
 - **MCP Resources** — structured data via `recon://` URIs for packages, symbols, files, and stats
@@ -20,11 +22,16 @@ AI coding agents are blind to architecture. They grep, they guess, they break th
 
 ## Supported Languages
 
-| Language | What's indexed |
-|----------|---------------|
-| **Go** | Packages, functions, methods, structs, interfaces, call graph, imports |
-| **TypeScript** | Modules, components, functions, types, JSX usage, imports |
-| **Cross-language** | HTTP API routes mapped from Go handlers to TypeScript consumers |
+| Language | Analyzer | What's indexed |
+|----------|----------|---------------|
+| **Go** | Dedicated (AST CLI) | Packages, functions, methods, structs, interfaces, call graph, imports |
+| **TypeScript** | Dedicated (Compiler API) | Modules, components, functions, types, JSX usage, imports |
+| **Python** | Tree-sitter | Classes, functions, methods, inheritance, imports, calls |
+| **Rust** | Tree-sitter | Structs, enums, traits, functions, impl blocks, use imports, calls |
+| **Java** | Tree-sitter | Classes, interfaces, enums, methods, imports, calls |
+| **C** | Tree-sitter | Functions, structs, enums, macros, #include imports, calls |
+| **C++** | Tree-sitter | Classes, structs, namespaces, enums, functions, inheritance, calls |
+| **Cross-language** | Route matching | HTTP API routes mapped from Go handlers to TypeScript consumers |
 
 ## Architecture
 
@@ -35,6 +42,12 @@ AI coding agents are blind to architecture. They grep, they guess, they break th
 │   │   ├── go-analyzer.ts   # Go packages + AST symbol extraction
 │   │   ├── ts-analyzer.ts   # TypeScript/React component extraction
 │   │   ├── cross-language.ts # Go route ↔ TS API call matching
+│   │   ├── tree-sitter/     # Multi-language tree-sitter analyzer
+│   │   │   ├── parser.ts    #   Grammar loading + language detection
+│   │   │   ├── queries.ts   #   S-expression queries (5 languages)
+│   │   │   ├── extractor.ts #   Symbol/call/import/heritage extraction
+│   │   │   ├── analyzer.ts  #   File walker + incremental indexing
+│   │   │   └── index.ts     #   Module barrel
 │   │   └── types.ts         # Shared analyzer interfaces
 │   ├── graph/
 │   │   ├── graph.ts         # KnowledgeGraph — in-memory Map + adjacency index
@@ -46,6 +59,10 @@ AI coding agents are blind to architecture. They grep, they guess, they break th
 │   │   ├── hints.ts         # Next-step hints appended to responses
 │   │   ├── rename.ts        # Graph-aware multi-file rename
 │   │   └── resources.ts     # MCP Resources (recon:// URIs)
+│   ├── query/
+│   │   ├── parser.ts        # Simplified Cypher DSL parser
+│   │   ├── executor.ts      # Query execution + markdown formatting
+│   │   └── index.ts         # Module barrel
 │   ├── search/
 │   │   ├── bm25.ts          # Standalone BM25 search index
 │   │   └── index.ts         # Module barrel
@@ -67,11 +84,12 @@ AI coding agents are blind to architecture. They grep, they guess, they break th
   go list → Go packages      ─┐
   Go AST CLI → symbols/calls  ├─→ KnowledgeGraph ─→ .recon/graph.json
   TS Compiler API → components ├─→   (in-memory)  ─→ .recon/meta.json
-  router.go → API routes      ─┘    + BM25 Index  ─→ .recon/search.json
+  tree-sitter → 5 languages   ├─→   + BM25 Index  ─→ .recon/search.json
+  router.go → API routes      ─┘
                                          │
                                     MCP Server (stdio)
                                     ┌────┴────┐
-                                 7 Tools   4 Resources
+                                 8 Tools   4 Resources
                                     │         │
                               ┌─────┼─────┐   recon://packages
                               │     │     │   recon://symbol/{name}
@@ -88,7 +106,7 @@ npm install
 npm run build
 ```
 
-Requires Node.js >= 20 and Go (for AST analysis). The Go AST analyzer binary is built automatically on first index.
+Requires Node.js >= 20 and Go (for AST analysis). The Go AST analyzer binary is built automatically on first index. Tree-sitter grammars for Python, Rust, Java, C, and C++ are installed as npm dependencies.
 
 ## Usage
 
@@ -143,9 +161,9 @@ Search the knowledge graph for symbols by name or pattern. Uses BM25 ranked sear
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `query` | `string` | **Required.** Name or substring to search (case-insensitive) |
-| `type` | `string` | Filter: `Function`, `Method`, `Struct`, `Interface`, `Component`, `Type`, `Package` |
+| `type` | `string` | Filter: `Function`, `Method`, `Struct`, `Interface`, `Component`, `Type`, `Package`, `Class`, `Enum`, `Trait` |
 | `package` | `string` | Filter by package path substring |
-| `language` | `"go" \| "typescript"` | Filter by language |
+| `language` | `"go" \| "typescript" \| "python" \| "rust" \| "java" \| "c" \| "cpp"` | Filter by language |
 | `limit` | `number` | Max results (default: 20) |
 
 ### recon_context
@@ -168,7 +186,7 @@ Blast radius analysis — what breaks if you change a symbol.
 | `direction` | `"upstream" \| "downstream"` | **Required.** Callers or callees |
 | `maxDepth` | `number` | Traversal depth (default: 3) |
 | `includeTests` | `boolean` | Include test files (default: `false`) |
-| `relationTypes` | `string[]` | Filter edges: `CALLS`, `IMPORTS`, `HAS_METHOD`, `IMPLEMENTS`, `USES_COMPONENT`, `CALLS_API` |
+| `relationTypes` | `string[]` | Filter edges: `CALLS`, `IMPORTS`, `HAS_METHOD`, `IMPLEMENTS`, `USES_COMPONENT`, `CALLS_API`, `EXTENDS` |
 | `minConfidence` | `number` | Confidence threshold 0.0-1.0 (default: 0.0) |
 | `file` | `string` | Disambiguate by file path substring |
 
@@ -210,6 +228,45 @@ Each edit is tagged with a confidence level:
 
 **Usage:** Run with `dry_run: true` first (default) to preview the edit plan, then `dry_run: false` to apply.
 
+### recon_query_graph
+
+Execute structural queries against the knowledge graph using a simplified Cypher-like syntax. Returns results as a markdown table.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | `string` | **Required.** Cypher-like query (`MATCH...WHERE...RETURN...LIMIT`) |
+| `limit` | `number` | Max rows to return (default: 50) |
+
+**Supported syntax:**
+
+```cypher
+-- Find all classes
+MATCH (c:Class) RETURN c.name, c.file
+
+-- Find callers of a function
+MATCH (a)-[:CALLS]->(b:Function) WHERE b.name = 'main' RETURN a.name, a.file
+
+-- Find methods of a struct
+MATCH (s:Struct)-[:HAS_METHOD]->(m:Method) WHERE s.name = 'Config' RETURN m.name, m.file
+
+-- Find class inheritance
+MATCH (child:Class)-[:EXTENDS]->(parent:Class) RETURN child.name, parent.name
+
+-- Find exported functions in a package
+MATCH (f:Function) WHERE f.package CONTAINS 'auth' AND f.exported = 'true' RETURN f.name, f.file
+
+-- Find interface implementations
+MATCH (s:Struct)-[:IMPLEMENTS]->(i:Interface) RETURN s.name, i.name
+```
+
+**Node types:** `Package`, `File`, `Function`, `Method`, `Struct`, `Interface`, `Module`, `Component`, `Type`, `Class`, `Enum`, `Trait`
+
+**Edge types:** `CONTAINS`, `DEFINES`, `CALLS`, `IMPORTS`, `HAS_METHOD`, `IMPLEMENTS`, `USES_COMPONENT`, `CALLS_API`, `EXTENDS`
+
+**WHERE operators:** `=`, `<>`, `CONTAINS`, `STARTS WITH` (all case-insensitive)
+
+**Node properties:** `id`, `type`, `name`, `file`, `startLine`, `endLine`, `language`, `package`, `exported`
+
 ## MCP Resources
 
 Recon exposes structured data via `recon://` URIs that MCP clients can read directly.
@@ -241,6 +298,7 @@ Files are hashed with SHA-256. On re-index, only changed files are re-analyzed:
 
 - **Go**: per-package granularity — if any `.go` file in a package changed, re-analyze the whole package
 - **TypeScript**: per-file granularity — only re-parse changed `.ts`/`.tsx` files
+- **Tree-sitter languages**: per-file granularity — only re-parse changed source files
 - Unchanged symbols are carried over from the previous index
 
 Force full re-index with `--force` if the graph seems stale.
@@ -259,6 +317,10 @@ Force full re-index with `--force` if the graph seems stale.
 | Interface | `go:iface:{pkg}.{name}` / `ts:iface:{path}:{name}` | Both |
 | Component | `ts:comp:{path}:{name}` | TS |
 | Type | `ts:type:{path}:{name}` | TS |
+| Class | `py:class:{path}:{name}:{line}` | Python, Java, C++ |
+| Enum | `rs:enum:{path}:{name}:{line}` | Rust, Java, C, C++ |
+| Trait | `rs:trait:{path}:{name}:{line}` | Rust |
+| Module | `py:mod:{path}:{name}:{line}` | Python |
 
 ### Relationship Types
 
@@ -268,8 +330,9 @@ Force full re-index with `--force` if the graph seems stale.
 | DEFINES | File -> Symbol | 1.0 |
 | CALLS | Function -> Function | 0.5-1.0 |
 | IMPORTS | Package -> Package / File -> File | 1.0 |
-| HAS_METHOD | Struct -> Method | 1.0 |
-| IMPLEMENTS | Struct -> Interface | 0.8 |
+| HAS_METHOD | Struct/Class -> Method | 1.0 |
+| IMPLEMENTS | Struct -> Interface / Class -> Trait | 0.8-0.9 |
+| EXTENDS | Class -> Class (inheritance) | 0.9 |
 | USES_COMPONENT | Component -> Component (JSX) | 0.9 |
 | CALLS_API | TS Function -> Go Handler (cross-language) | 0.85-0.95 |
 
@@ -280,7 +343,7 @@ npm test           # Run all tests
 npx vitest --watch # Watch mode
 ```
 
-143+ tests covering:
+248 tests covering:
 
 | Suite | Tests | What's covered |
 |-------|-------|----------------|
@@ -289,6 +352,8 @@ npx vitest --watch # Watch mode
 | `search.test.ts` | 27 | BM25 tokenizer, ranking, serialization |
 | `rename.test.ts` | 28 | Graph-aware rename planning, disambiguation, formatting |
 | `resources.test.ts` | 35 | Resource URI parsing, all 4 resource types |
+| `tree-sitter.test.ts` | 58 | Multi-language extraction, graph construction, cross-language consistency |
+| `query.test.ts` | 47 | Cypher parser, query execution, markdown formatting, error handling |
 
 ## License
 
