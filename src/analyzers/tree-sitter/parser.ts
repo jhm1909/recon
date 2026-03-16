@@ -32,6 +32,12 @@ const EXTENSION_MAP: Record<string, Language> = {
   '.hpp': Language.Cpp,
   '.hxx': Language.Cpp,
   '.hh': Language.Cpp,
+  '.rb': Language.Ruby,
+  '.php': Language.PHP,
+  '.cs': Language.CSharp,
+  '.kt': Language.Kotlin,
+  '.kts': Language.Kotlin,
+  '.swift': Language.Swift,
 };
 
 /**
@@ -57,6 +63,14 @@ function loadLanguages(): void {
     [Language.Java, () => _require('tree-sitter-java')],
     [Language.C, () => _require('tree-sitter-c')],
     [Language.Cpp, () => _require('tree-sitter-cpp')],
+    [Language.Ruby, () => _require('tree-sitter-ruby')],
+    [Language.PHP, () => {
+      const php = _require('tree-sitter-php');
+      return php.php ?? php;
+    }],
+    [Language.CSharp, () => _require('tree-sitter-c-sharp')],
+    [Language.Kotlin, () => _require('tree-sitter-kotlin')],
+    [Language.Swift, () => _require('tree-sitter-swift')],
   ];
 
   for (const [lang, loader] of loaders) {

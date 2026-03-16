@@ -156,6 +156,107 @@ export const CPP_QUERIES = `
   (base_class_clause (access_specifier) (type_identifier) @heritage.extends)) @heritage
 `;
 
+// ─── Ruby ───────────────────────────────────────────────────────
+
+export const RUBY_QUERIES = `
+(class name: (constant) @name) @definition.class
+(module name: (constant) @name) @definition.module
+(method name: (identifier) @name) @definition.function
+(singleton_method name: (identifier) @name) @definition.function
+
+(call method: (identifier) @import.source) @import
+
+(call method: (identifier) @call.name) @call
+
+(class name: (constant) @heritage.class
+  superclass: (superclass (constant) @heritage.extends)) @heritage
+`;
+
+// ─── PHP ────────────────────────────────────────────────────────
+
+export const PHP_QUERIES = `
+(class_declaration name: (name) @name) @definition.class
+(interface_declaration name: (name) @name) @definition.interface
+(trait_declaration name: (name) @name) @definition.trait
+(enum_declaration name: (name) @name) @definition.enum
+
+(function_definition name: (name) @name) @definition.function
+(method_declaration name: (name) @name) @definition.method
+
+(namespace_use_declaration (namespace_use_clause (qualified_name) @import.source)) @import
+
+(function_call_expression function: (name) @call.name) @call
+(function_call_expression function: (qualified_name) @call.name) @call
+(member_call_expression name: (name) @call.name) @call
+(scoped_call_expression name: (name) @call.name) @call
+(object_creation_expression (qualified_name) @call.name) @call
+
+(class_declaration name: (name) @heritage.class
+  (base_clause (name) @heritage.extends)) @heritage
+
+(class_declaration name: (name) @heritage.class
+  (class_interface_clause (name) @heritage.implements)) @heritage.impl
+`;
+
+// ─── C# ─────────────────────────────────────────────────────────
+
+export const CSHARP_QUERIES = `
+(class_declaration name: (identifier) @name) @definition.class
+(interface_declaration name: (identifier) @name) @definition.interface
+(struct_declaration name: (identifier) @name) @definition.struct
+(enum_declaration name: (identifier) @name) @definition.enum
+
+(method_declaration name: (identifier) @name) @definition.method
+(constructor_declaration name: (identifier) @name) @definition.constructor
+
+(using_directive (qualified_name) @import.source) @import
+(using_directive (identifier) @import.source) @import
+
+(invocation_expression function: (identifier) @call.name) @call
+(invocation_expression function: (member_access_expression name: (identifier) @call.name)) @call
+(object_creation_expression type: (identifier) @call.name) @call
+
+(class_declaration name: (identifier) @heritage.class
+  (base_list (identifier) @heritage.extends)) @heritage
+`;
+
+// ─── Kotlin ─────────────────────────────────────────────────────
+
+export const KOTLIN_QUERIES = `
+(class_declaration (type_identifier) @name) @definition.class
+(object_declaration (type_identifier) @name) @definition.class
+(interface_declaration (type_identifier) @name) @definition.interface
+
+(function_declaration (simple_identifier) @name) @definition.function
+
+(import_header (identifier) @import.source) @import
+
+(call_expression (simple_identifier) @call.name) @call
+(call_expression (navigation_expression (simple_identifier) @call.name)) @call
+
+(class_declaration (type_identifier) @heritage.class
+  (delegation_specifier_list (delegation_specifier (user_type (type_identifier) @heritage.extends)))) @heritage
+`;
+
+// ─── Swift ──────────────────────────────────────────────────────
+
+export const SWIFT_QUERIES = `
+(class_declaration name: (type_identifier) @name) @definition.class
+(protocol_declaration name: (type_identifier) @name) @definition.interface
+(struct_declaration name: (type_identifier) @name) @definition.struct
+(enum_declaration name: (type_identifier) @name) @definition.enum
+
+(function_declaration name: (simple_identifier) @name) @definition.function
+
+(import_declaration (identifier) @import.source) @import
+
+(call_expression (simple_identifier) @call.name) @call
+(call_expression (navigation_expression (simple_identifier) @call.name)) @call
+
+(class_declaration name: (type_identifier) @heritage.class
+  (inheritance_specifier (type_identifier) @heritage.extends)) @heritage
+`;
+
 // ─── Query Map ──────────────────────────────────────────────────
 
 export const LANGUAGE_QUERIES: Partial<Record<Language, string>> = {
@@ -164,4 +265,9 @@ export const LANGUAGE_QUERIES: Partial<Record<Language, string>> = {
   [Language.Java]: JAVA_QUERIES,
   [Language.C]: C_QUERIES,
   [Language.Cpp]: CPP_QUERIES,
+  [Language.Ruby]: RUBY_QUERIES,
+  [Language.PHP]: PHP_QUERIES,
+  [Language.CSharp]: CSHARP_QUERIES,
+  [Language.Kotlin]: KOTLIN_QUERIES,
+  [Language.Swift]: SWIFT_QUERIES,
 };

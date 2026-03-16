@@ -10,6 +10,11 @@
  *   Java:   java:file:, java:func:, java:class:, java:iface:, java:enum:
  *   C:      c:file:, c:func:, c:struct:, c:enum:
  *   C++:    cpp:file:, cpp:func:, cpp:class:, cpp:struct:, cpp:enum:
+ *   Ruby:   rb:file:, rb:func:, rb:class:, rb:method:
+ *   PHP:    php:file:, php:func:, php:class:, php:iface:
+ *   C#:     cs:file:, cs:func:, cs:class:, cs:iface:, cs:enum:
+ *   Kotlin: kt:file:, kt:func:, kt:class:, kt:iface:, kt:enum:
+ *   Swift:  swift:file:, swift:func:, swift:class:, swift:struct:, swift:enum:
  */
 
 // ─── Enums ──────────────────────────────────────────────────────
@@ -49,6 +54,11 @@ export enum Language {
   Java = 'java',
   C = 'c',
   Cpp = 'cpp',
+  Ruby = 'ruby',
+  PHP = 'php',
+  CSharp = 'csharp',
+  Kotlin = 'kotlin',
+  Swift = 'swift',
 }
 
 // ─── Node ───────────────────────────────────────────────────────

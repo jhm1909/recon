@@ -22,6 +22,11 @@ const LANG_PREFIX: Record<Language, string> = {
   [Language.Cpp]: 'cpp',
   [Language.Go]: 'go',
   [Language.TypeScript]: 'ts',
+  [Language.Ruby]: 'rb',
+  [Language.PHP]: 'php',
+  [Language.CSharp]: 'cs',
+  [Language.Kotlin]: 'kt',
+  [Language.Swift]: 'swift',
 };
 
 // ─── Capture → NodeType Mapping ─────────────────────────────────
@@ -78,6 +83,49 @@ function isExported(name: string, language: Language, node?: any): boolean {
     case Language.C:
     case Language.Cpp:
       // C/C++: everything in a header is exported, non-static in .c files
+      return true;
+    case Language.Ruby:
+      // Ruby: methods starting with _ are private by convention
+      return !name.startsWith('_');
+    case Language.PHP:
+      // PHP: check for public/protected/private keywords
+      if (node?.parent?.children) {
+        for (const child of node.parent.children) {
+          if (child.type === 'visibility_modifier') {
+            return child.text === 'public';
+          }
+        }
+      }
+      return true; // default to exported
+    case Language.CSharp:
+      // C#: check for public modifier
+      if (node?.parent?.children) {
+        for (const child of node.parent.children) {
+          if (child.type === 'modifier') {
+            if (child.text === 'private' || child.text === 'internal') return false;
+          }
+        }
+      }
+      return true;
+    case Language.Kotlin:
+      // Kotlin: check for private/internal modifiers
+      if (node?.parent?.children) {
+        for (const child of node.parent.children) {
+          if (child.type === 'visibility_modifier') {
+            return child.text === 'public' || child.text === undefined;
+          }
+        }
+      }
+      return true; // default public in Kotlin
+    case Language.Swift:
+      // Swift: check for access modifiers
+      if (node?.parent?.children) {
+        for (const child of node.parent.children) {
+          if (child.type === 'modifiers') {
+            if (child.text?.includes('private') || child.text?.includes('fileprivate')) return false;
+          }
+        }
+      }
       return true;
     default:
       return true;
