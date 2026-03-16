@@ -1,6 +1,6 @@
 {
   "name": "recon",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Lightweight code intelligence engine for AI agents. Dependency mapping, blast radius analysis, and call graph via MCP.",
   "type": "module",
   "bin": {

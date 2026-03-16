@@ -1,8 +1,8 @@
 # Recon
 
-Lightweight code intelligence engine for AI agents. Builds a knowledge graph of Go and TypeScript symbols, tracks cross-language API calls, and exposes 6 tools via [Model Context Protocol](https://modelcontextprotocol.io/).
+Lightweight code intelligence engine for AI agents. Builds a knowledge graph of Go and TypeScript symbols, tracks cross-language API calls, and exposes 7 tools + 4 resources via [Model Context Protocol](https://modelcontextprotocol.io/).
 
-> Give your AI agent architectural awareness — dependency mapping, blast radius analysis, and call graph traversal without reading every file.
+> Give your AI agent architectural awareness — dependency mapping, blast radius analysis, safe renames, and call graph traversal without reading every file.
 
 ---
 
@@ -11,7 +11,10 @@ Lightweight code intelligence engine for AI agents. Builds a knowledge graph of 
 AI coding agents are blind to architecture. They grep, they guess, they break things. Recon fixes this by indexing your codebase into a knowledge graph that agents can query through MCP:
 
 - **Blast radius before editing** — know what breaks before you touch it
+- **Graph-aware rename** — safe multi-file renames using the call graph, not find-and-replace
+- **BM25 ranked search** — keyword search with camelCase/snake_case tokenization and relevance scoring
 - **Cross-language tracing** — follow API calls from TypeScript frontend to Go backend
+- **MCP Resources** — structured data via `recon://` URIs for packages, symbols, files, and stats
 - **Incremental indexing** — sub-second re-index on file changes
 - **Zero config** — point it at a repo, run `npx recon index`, done
 
@@ -40,7 +43,12 @@ AI coding agents are blind to architecture. They grep, they guess, they break th
 │   │   ├── server.ts        # MCP server (stdio transport)
 │   │   ├── tools.ts         # Tool definitions (JSON Schema)
 │   │   ├── handlers.ts      # Tool dispatch + query logic
-│   │   └── hints.ts         # Next-step hints appended to responses
+│   │   ├── hints.ts         # Next-step hints appended to responses
+│   │   ├── rename.ts        # Graph-aware multi-file rename
+│   │   └── resources.ts     # MCP Resources (recon:// URIs)
+│   ├── search/
+│   │   ├── bm25.ts          # Standalone BM25 search index
+│   │   └── index.ts         # Module barrel
 │   ├── storage/
 │   │   ├── store.ts         # JSON file I/O (.recon/)
 │   │   └── types.ts         # IndexMeta, IndexStats
@@ -59,13 +67,16 @@ AI coding agents are blind to architecture. They grep, they guess, they break th
   go list → Go packages      ─┐
   Go AST CLI → symbols/calls  ├─→ KnowledgeGraph ─→ .recon/graph.json
   TS Compiler API → components ├─→   (in-memory)  ─→ .recon/meta.json
-  router.go → API routes      ─┘
+  router.go → API routes      ─┘    + BM25 Index  ─→ .recon/search.json
                                          │
                                     MCP Server (stdio)
-                                         │
-                              ┌──────────┼──────────┐
-                              │          │          │
-                         Claude Code   Cursor    Other MCP clients
+                                    ┌────┴────┐
+                                 7 Tools   4 Resources
+                                    │         │
+                              ┌─────┼─────┐   recon://packages
+                              │     │     │   recon://symbol/{name}
+                         Claude   Cursor  …   recon://file/{path}
+                          Code            …   recon://stats
 ```
 
 ## Installation
@@ -127,7 +138,7 @@ List all packages (Go) and modules (TypeScript) with dependency relationships.
 
 ### recon_query
 
-Search the knowledge graph for symbols by name or pattern.
+Search the knowledge graph for symbols by name or pattern. Uses BM25 ranked search with automatic camelCase/snake_case tokenization — `"AuthMiddle"` finds `AuthMiddleware`, and exact names rank highest. Falls back to substring matching when BM25 returns no results.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -182,6 +193,48 @@ Cross-language API route map — endpoint -> Go handler -> TypeScript consumers.
 | `pattern` | `string` | Filter by URL pattern substring |
 | `handler` | `string` | Filter by handler name substring |
 
+### recon_rename
+
+Safe multi-file rename using the knowledge graph. Traces callers, importers, method owners, and component users to generate a confidence-tagged edit plan. Safer than find-and-replace because it understands the call graph.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `symbol_name` | `string` | **Required.** Current name of the symbol |
+| `new_name` | `string` | **Required.** New name for the symbol |
+| `file` | `string` | Disambiguate when multiple symbols share a name |
+| `dry_run` | `boolean` | Preview edits without applying (default: `true`) |
+
+Each edit is tagged with a confidence level:
+- **`graph`** — found via knowledge graph relationship (high confidence, safe to accept)
+- **`text_search`** — found via name matching (lower confidence, review carefully)
+
+**Usage:** Run with `dry_run: true` first (default) to preview the edit plan, then `dry_run: false` to apply.
+
+## MCP Resources
+
+Recon exposes structured data via `recon://` URIs that MCP clients can read directly.
+
+| Resource | URI | Description |
+|----------|-----|-------------|
+| Package Map | `recon://packages` | All packages/modules with dependency counts |
+| Index Stats | `recon://stats` | Node and relationship counts by type and language |
+| Symbol Detail | `recon://symbol/{name}` | Symbol definition, callers, callees, relationships |
+| File Symbols | `recon://file/{path}` | All symbols in a file with types and line ranges |
+
+**Example:** An agent can `READ recon://stats` to get an overview of the indexed codebase, or `READ recon://symbol/AuthMiddleware` to see all callers and callees without making a tool call.
+
+## Search
+
+`recon_query` uses a standalone BM25 ranking algorithm for relevance-scored search:
+
+- **Tokenizer** splits camelCase, PascalCase, snake_case, and digit boundaries (`base64Decode` → `["base", "64", "decode"]`)
+- **Name boost** — symbol names are weighted 3x higher than file paths and packages
+- **IDF scoring** — rare terms rank higher than common ones
+- **Lazy initialization** — the BM25 index is built on first query and cached; invalidated when the graph changes
+- **Fallback** — when BM25 returns no results, falls back to case-insensitive substring matching
+
+The search index is persisted to `.recon/search.json` during indexing for fast cold starts.
+
 ## Incremental Indexing
 
 Files are hashed with SHA-256. On re-index, only changed files are re-analyzed:
@@ -219,6 +272,23 @@ Force full re-index with `--force` if the graph seems stale.
 | IMPLEMENTS | Struct -> Interface | 0.8 |
 | USES_COMPONENT | Component -> Component (JSX) | 0.9 |
 | CALLS_API | TS Function -> Go Handler (cross-language) | 0.85-0.95 |
+
+## Testing
+
+```bash
+npm test           # Run all tests
+npx vitest --watch # Watch mode
+```
+
+143+ tests covering:
+
+| Suite | Tests | What's covered |
+|-------|-------|----------------|
+| `graph.test.ts` | 23 | KnowledgeGraph API — add, query, remove, serialize |
+| `handlers.test.ts` | 30 | MCP tool dispatch with 9-node mock graph |
+| `search.test.ts` | 27 | BM25 tokenizer, ranking, serialization |
+| `rename.test.ts` | 28 | Graph-aware rename planning, disambiguation, formatting |
+| `resources.test.ts` | 35 | Resource URI parsing, all 4 resource types |
 
 ## License
 
