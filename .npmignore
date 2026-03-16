@@ -1,0 +1,23 @@
+# Source & tests
+src/
+test/
+
+# Config
+tsconfig.json
+tsconfig.test.json
+vitest.config.ts
+recon.config.example.json
+
+# Docs & meta
+CLAUDE.md
+CONTRIBUTING.md
+.github/
+
+# Generated / local
+.recon/
+.reference/
+.agent/
+.claude/
+
+# Git
+.gitignore

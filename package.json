@@ -3,13 +3,22 @@
   "version": "5.0.0",
   "description": "Lightweight code intelligence engine for AI agents. Dependency mapping, blast radius analysis, and call graph via MCP.",
   "type": "module",
+  "main": "dist/cli/index.js",
   "bin": {
     "recon": "./bin/recon"
   },
+  "files": [
+    "bin/",
+    "dist/",
+    "analyzer/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepare": "npm run build"
   },
   "keywords": [
     "code-intelligence",
@@ -55,7 +64,7 @@
     "vitest": "^4.1.0"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   },
   "optionalDependencies": {
     "@huggingface/transformers": "^3.8.1",
