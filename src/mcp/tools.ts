@@ -129,9 +129,9 @@ AFTER THIS: Use recon_impact() if planning changes.`,
   },
   {
     name: 'recon_query',
-    description: `Search the knowledge graph for symbols by name or pattern. Use when you need to find a function, struct, or component by name.
+    description: `Search the knowledge graph for symbols by name or pattern. Supports hybrid search (BM25 + semantic vector search) when embeddings are available.
 
-WHEN TO USE: When you need to find a function, struct, or component by name. Complements grep — returns structured results with dependency info.
+WHEN TO USE: When you need to find a function, struct, or component by name. Complements grep — returns structured results with dependency info. Semantic mode understands meaning, not just keywords.
 AFTER THIS: Use recon_context({name}) for 360° view of a result.`,
     inputSchema: {
       type: 'object',
@@ -153,6 +153,11 @@ AFTER THIS: Use recon_context({name}) for 360° view of a result.`,
           type: 'string',
           description: 'Filter by language',
           enum: ['go', 'typescript', 'python', 'rust', 'java', 'c', 'cpp'],
+        },
+        semantic: {
+          type: 'boolean',
+          description: 'Enable semantic search (BM25 + vector embeddings). Default: true when embeddings available.',
+          default: true,
         },
         limit: {
           type: 'number',

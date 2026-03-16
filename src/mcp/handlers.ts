@@ -458,6 +458,7 @@ async function handleQuery(
   const typeFilter = args?.type as string;
   const pkgFilter = args?.package as string;
   const langFilter = args?.language as string;
+  const semanticEnabled = (args?.semantic as boolean) ?? true;
   const limit = (args?.limit as number) || 20;
 
   if (!rawQuery) throw new Error("'query' parameter is required.");
@@ -470,9 +471,9 @@ async function handleQuery(
   const searchIndex = getSearchIndex(graph);
   const bm25Hits = searchIndex.search(rawQuery, limit * 3);
 
-  // Attempt hybrid search if vector store is available
+  // Attempt hybrid search if vector store is available and semantic enabled
   let hybridResults: HybridSearchResult[] | null = null;
-  if (vectorStore && vectorStore.size > 0) {
+  if (semanticEnabled && vectorStore && vectorStore.size > 0) {
     try {
       const queryEmb = isEmbedderReady()
         ? await embedText(rawQuery)

@@ -52,7 +52,7 @@
     "node": ">=20.0.0"
   },
   "optionalDependencies": {
-    "@huggingface/transformers": "^3.0.0",
+    "@huggingface/transformers": "^3.8.1",
     "tree-sitter-kotlin": "^0.3.8",
     "tree-sitter-swift": "^0.7.1"
   }

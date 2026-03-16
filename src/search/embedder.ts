@@ -19,7 +19,7 @@ export interface EmbedderConfig {
 }
 
 export const DEFAULT_CONFIG: EmbedderConfig = {
-  modelId: 'Snowflake/snowflake-arctic-embed-xs',
+  modelId: 'Xenova/all-MiniLM-L6-v2',
   dimensions: 384,
 };
 
