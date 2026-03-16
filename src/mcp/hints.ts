@@ -43,6 +43,9 @@ export function getNextStepHint(
     case 'recon_list_repos':
       return '\n\n---\n**Next:** Use any tool with repo parameter to filter by a specific repo, e.g. recon_query({query: "...", repo: "<repo_name>"}).';
 
+    case 'recon_processes':
+      return '\n\n---\n**Next:** Use READ recon://process/{name} for a step-by-step trace of a specific flow, or recon_context({name: "<symbol>"}) for 360° view of a step.';
+
     default:
       return '';
   }

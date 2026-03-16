@@ -8,6 +8,7 @@
 import { KnowledgeGraph } from '../graph/graph.js';
 import { NodeType, RelationshipType } from '../graph/types.js';
 import type { Node } from '../graph/types.js';
+import { getProcess } from '../graph/process.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -58,13 +59,19 @@ export function getResourceTemplates(): ResourceTemplate[] {
       description: 'All symbols defined in a file with their types and line ranges.',
       mimeType: 'text/yaml',
     },
+    {
+      uriTemplate: 'recon://process/{name}',
+      name: 'Process Trace',
+      description: 'Step-by-step execution trace of a detected process/flow.',
+      mimeType: 'text/yaml',
+    },
   ];
 }
 
 // ─── URI Parsing ────────────────────────────────────────────────
 
 interface ParsedUri {
-  resourceType: 'packages' | 'stats' | 'symbol' | 'file';
+  resourceType: 'packages' | 'stats' | 'symbol' | 'file' | 'process';
   param?: string;
 }
 
@@ -80,6 +87,11 @@ export function parseUri(uri: string): ParsedUri {
   const fileMatch = uri.match(/^recon:\/\/file\/(.+)$/);
   if (fileMatch) {
     return { resourceType: 'file', param: decodeURIComponent(fileMatch[1]) };
+  }
+
+  const processMatch = uri.match(/^recon:\/\/process\/(.+)$/);
+  if (processMatch) {
+    return { resourceType: 'process', param: decodeURIComponent(processMatch[1]) };
   }
 
   throw new Error(`Unknown resource URI: ${uri}`);
@@ -99,6 +111,8 @@ export function readResource(uri: string, graph: KnowledgeGraph): string {
       return getSymbolResource(graph, parsed.param!);
     case 'file':
       return getFileResource(graph, parsed.param!);
+    case 'process':
+      return getProcessResource(graph, parsed.param!);
   }
 }
 
@@ -307,6 +321,54 @@ function getFileResource(graph: KnowledgeGraph, path: string): string {
       lines.push(`    type: ${sym.type}`);
       lines.push(`    lines: ${sym.startLine}-${sym.endLine}`);
       lines.push(`    exported: ${sym.exported}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function getProcessResource(graph: KnowledgeGraph, name: string): string {
+  const process = getProcess(graph, name);
+
+  if (!process) {
+    return `error: Process "${name}" not found`;
+  }
+
+  const lines: string[] = [
+    `name: "${process.name}"`,
+    `complexity: ${process.complexity}`,
+    `depth: ${process.depth}`,
+    `total_steps: ${process.steps.length}`,
+    '',
+    'entry_point:',
+    `  name: "${process.entryPoint.name}"`,
+    `  type: ${process.entryPoint.type}`,
+    `  file: "${process.entryPoint.file}"`,
+    `  line: ${process.entryPoint.line}`,
+    `  language: ${process.entryPoint.language}`,
+    `  package: "${process.entryPoint.package}"`,
+  ];
+
+  if (process.steps.length > 0) {
+    lines.push('');
+    lines.push('steps:');
+
+    // Group steps by depth
+    const byDepth = new Map<number, typeof process.steps>();
+    for (const step of process.steps) {
+      if (!byDepth.has(step.depth)) byDepth.set(step.depth, []);
+      byDepth.get(step.depth)!.push(step);
+    }
+
+    for (const [depth, steps] of [...byDepth.entries()].sort((a, b) => a[0] - b[0])) {
+      lines.push(`  # depth ${depth}`);
+      for (const step of steps) {
+        lines.push(`  - name: "${step.name}"`);
+        lines.push(`    type: ${step.type}`);
+        lines.push(`    file: "${step.file}"`);
+        lines.push(`    line: ${step.line}`);
+        lines.push(`    depth: ${step.depth}`);
+      }
     }
   }
 

@@ -17,6 +17,7 @@ import { planRename, formatRenameResult } from './rename.js';
 import type { RenameResult } from './rename.js';
 import { executeQuery as executeCypherQuery, formatResultAsMarkdown } from '../query/index.js';
 import { listRepos } from '../storage/store.js';
+import { detectProcesses } from '../graph/process.js';
 
 /**
  * Filter a graph to only include nodes belonging to a specific repo.
@@ -91,6 +92,9 @@ export async function handleToolCall(
 
     case 'recon_list_repos':
       return handleListRepos(projectRoot);
+
+    case 'recon_processes':
+      return handleProcesses(args, graph);
 
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -1133,6 +1137,47 @@ async function handleListRepos(projectRoot?: string): Promise<string> {
     lines.push(`  Go packages: ${repo.meta.stats.goPackages}, Go symbols: ${repo.meta.stats.goSymbols}`);
     lines.push(`  TS modules: ${repo.meta.stats.tsModules}, TS symbols: ${repo.meta.stats.tsSymbols}`);
     lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+// ─── recon_processes ────────────────────────────────────────────
+
+function handleProcesses(
+  args: Record<string, unknown> | undefined,
+  graph: KnowledgeGraph,
+): string {
+  const limit = (args?.limit as number) || 20;
+  const filter = args?.filter as string | undefined;
+
+  graph = maybeFilterByRepo(args, graph);
+
+  const processes = detectProcesses(graph, { limit, filter });
+
+  if (processes.length === 0) {
+    return [
+      '# Execution Flows',
+      '',
+      '_No execution flows detected._',
+    ].join('\n');
+  }
+
+  const lines: string[] = [
+    '# Execution Flows',
+    '',
+    `**Detected:** ${processes.length} flow(s)`,
+    ...(filter ? [`**Filter:** "${filter}"`] : []),
+    '',
+    '| # | Process | Entry Point | File | Steps | Depth | Complexity |',
+    '|---|---------|-------------|------|-------|-------|------------|',
+  ];
+
+  for (let i = 0; i < processes.length; i++) {
+    const p = processes[i];
+    lines.push(
+      `| ${i + 1} | **${p.name}** | ${p.entryPoint.type} | \`${p.entryPoint.file}:${p.entryPoint.line}\` | ${p.steps.length} | ${p.depth} | ${p.complexity} |`,
+    );
   }
 
   return lines.join('\n');

@@ -193,9 +193,10 @@ describe('resource definitions', () => {
 
   it('returns resource templates', () => {
     const templates = getResourceTemplates();
-    expect(templates.length).toBe(2);
+    expect(templates.length).toBe(3);
     expect(templates.map(t => t.uriTemplate)).toContain('recon://symbol/{name}');
     expect(templates.map(t => t.uriTemplate)).toContain('recon://file/{path}');
+    expect(templates.map(t => t.uriTemplate)).toContain('recon://process/{name}');
     for (const t of templates) {
       expect(t.name).toBeTruthy();
       expect(t.description).toBeTruthy();

@@ -314,4 +314,27 @@ AFTER THIS: Use any tool with repo parameter to filter by a specific repo.`,
       required: [],
     },
   },
+  {
+    name: 'recon_processes',
+    description: `Detect and list execution flows by tracing call chains from entry points (HTTP handlers, exported functions). Shows the full call chain with complexity ranking.
+
+WHEN TO USE: When you need to understand execution flows, trace request handling paths, or identify the most complex code paths in the codebase.
+AFTER THIS: Use READ recon://process/{name} for a detailed step-by-step trace of a specific flow.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Max processes to return (default: 20)',
+          default: 20,
+        },
+        filter: {
+          type: 'string',
+          description: 'Filter processes by name (substring match)',
+        },
+        repo: REPO_PROPERTY,
+      },
+      required: [],
+    },
+  },
 ];
