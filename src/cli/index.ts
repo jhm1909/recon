@@ -22,6 +22,7 @@ program
   .description('Index the codebase (Go packages + TypeScript modules)')
   .option('--force', 'Force full re-index (skip incremental)')
   .option('--repo <name>', 'Store index under a named repo (for multi-repo support)')
+  .option('--embeddings', 'Generate vector embeddings for semantic search')
   .action(async (options) => {
     await indexCommand(options);
   });

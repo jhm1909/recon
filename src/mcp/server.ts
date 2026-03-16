@@ -14,6 +14,7 @@ import {
   ListResourceTemplatesRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { KnowledgeGraph } from '../graph/graph.js';
+import type { VectorStore } from '../search/vector-store.js';
 import { RECON_TOOLS } from './tools.js';
 import { handleToolCall } from './handlers.js';
 import { getNextStepHint } from './hints.js';
@@ -28,7 +29,11 @@ const VERSION = '1.0.0';
 /**
  * Create a configured MCP Server with all handlers registered.
  */
-export function createServer(graph: KnowledgeGraph, projectRoot?: string): Server {
+export function createServer(
+  graph: KnowledgeGraph,
+  projectRoot?: string,
+  vectorStore?: VectorStore | null,
+): Server {
   const server = new Server(
     { name: 'recon', version: VERSION },
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
@@ -97,6 +102,7 @@ export function createServer(graph: KnowledgeGraph, projectRoot?: string): Serve
         args as Record<string, unknown> | undefined,
         graph,
         projectRoot,
+        vectorStore,
       );
       const hint = getNextStepHint(name, args as Record<string, unknown>);
 
@@ -118,8 +124,12 @@ export function createServer(graph: KnowledgeGraph, projectRoot?: string): Serve
 /**
  * Start the MCP server on stdio transport.
  */
-export async function startServer(graph: KnowledgeGraph, projectRoot?: string): Promise<void> {
-  const server = createServer(graph, projectRoot);
+export async function startServer(
+  graph: KnowledgeGraph,
+  projectRoot?: string,
+  vectorStore?: VectorStore | null,
+): Promise<void> {
+  const server = createServer(graph, projectRoot, vectorStore);
   const transport = new StdioServerTransport();
 
   let shuttingDown = false;

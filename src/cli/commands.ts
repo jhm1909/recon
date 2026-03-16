@@ -12,10 +12,13 @@ import { analyzeGoPackages, runGoList, getModulePath, analyzeGoSymbols } from '.
 import { analyzeTypeScript } from '../analyzers/ts-analyzer.js';
 import { buildCrossLanguageEdges, extractGoRoutes } from '../analyzers/cross-language.js';
 import type { APIRoute } from '../analyzers/cross-language.js';
-import { saveIndex, saveSearchIndex, loadIndex, listRepos, loadAllRepos, defaultRepoName } from '../storage/store.js';
+import { saveIndex, saveSearchIndex, saveEmbeddings, loadIndex, loadEmbeddings, listRepos, loadAllRepos, defaultRepoName } from '../storage/store.js';
 import type { IndexMeta } from '../storage/types.js';
 import { startServer } from '../mcp/server.js';
 import { BM25Index } from '../search/bm25.js';
+import { VectorStore } from '../search/vector-store.js';
+import { generateEmbeddingText, isEmbeddable } from '../search/text-generator.js';
+import { initEmbedder, embedBatch, disposeEmbedder, DEFAULT_CONFIG } from '../search/embedder.js';
 import { analyzeTreeSitter } from '../analyzers/tree-sitter/index.js';
 import { getAvailableLanguages } from '../analyzers/tree-sitter/index.js';
 import { detectCommunities } from '../graph/community.js';
@@ -48,7 +51,7 @@ function getGitInfo(cwd: string): { commit: string; branch: string } {
 
 // ??? index command ???????????????????????????????????????????????
 
-export async function indexCommand(options: { force?: boolean; repo?: string }): Promise<void> {
+export async function indexCommand(options: { force?: boolean; repo?: string; embeddings?: boolean }): Promise<void> {
   const startTime = performance.now();
   const projectRoot = findProjectRoot();
   const repoName = options.repo;
@@ -284,6 +287,43 @@ export async function indexCommand(options: { force?: boolean; repo?: string }):
   await saveSearchIndex(projectRoot, searchIndex, repoName);
   console.log(`[recon] Search index: ${searchIndex.documentCount} documents`);
 
+  // Embedding pipeline (optional)
+  if (options.embeddings) {
+    console.log('[recon] Generating embeddings...');
+    try {
+      await initEmbedder();
+
+      // Collect embeddable nodes
+      const embeddableNodes: Array<{ id: string; text: string }> = [];
+      for (const node of graph.nodes.values()) {
+        if (isEmbeddable(node)) {
+          embeddableNodes.push({
+            id: node.id,
+            text: generateEmbeddingText(node),
+          });
+        }
+      }
+
+      if (embeddableNodes.length > 0) {
+        const texts = embeddableNodes.map(n => n.text);
+        const embeddings = await embedBatch(texts);
+        const vectorStore = new VectorStore(DEFAULT_CONFIG.dimensions);
+
+        for (let i = 0; i < embeddableNodes.length; i++) {
+          vectorStore.add(embeddableNodes[i].id, embeddings[i]);
+        }
+
+        await saveEmbeddings(projectRoot, vectorStore, repoName);
+        console.log(`[recon] Embeddings: ${vectorStore.size} vectors (${DEFAULT_CONFIG.dimensions}d)`);
+      }
+
+      await disposeEmbedder();
+    } catch (err) {
+      console.error(`[recon] Embedding failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('[recon] Continuing without embeddings. Install @huggingface/transformers for semantic search.');
+    }
+  }
+
   const summary = [
     `${goPackages} Go packages`,
     `${goSymbols} Go symbols`,
@@ -324,6 +364,7 @@ export async function serveCommand(options?: { repo?: string }): Promise<void> {
   const repoName = options?.repo;
 
   let graph: KnowledgeGraph;
+  let vectorStore: VectorStore | null = null;
 
   if (repoName) {
     // Load specific repo
@@ -333,6 +374,7 @@ export async function serveCommand(options?: { repo?: string }): Promise<void> {
       process.exit(1);
     }
     graph = stored.graph;
+    vectorStore = await loadEmbeddings(projectRoot, repoName);
     console.error(`[recon] Loaded repo '${repoName}': ${graph.nodeCount} nodes, ${graph.relationshipCount} relationships`);
   } else {
     // Try loading all repos (merged), fall back to legacy single index
@@ -350,11 +392,16 @@ export async function serveCommand(options?: { repo?: string }): Promise<void> {
       graph = stored.graph;
       console.error(`[recon] Loaded index: ${graph.nodeCount} nodes, ${graph.relationshipCount} relationships`);
     }
+    vectorStore = await loadEmbeddings(projectRoot, repoName);
+  }
+
+  if (vectorStore) {
+    console.error(`[recon] Loaded ${vectorStore.size} embeddings (${vectorStore.dimensions}d)`);
   }
 
   console.error('[recon] MCP server starting on stdio...');
 
-  await startServer(graph, projectRoot);
+  await startServer(graph, projectRoot, vectorStore);
 }
 
 // ??? status command ??????????????????????????????????????????????

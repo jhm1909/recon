@@ -9,6 +9,10 @@ import { KnowledgeGraph } from '../graph/graph.js';
 import { NodeType, RelationshipType, Language } from '../graph/types.js';
 import type { Node, Relationship } from '../graph/types.js';
 import { BM25Index } from '../search/bm25.js';
+import { VectorStore } from '../search/vector-store.js';
+import { mergeWithRRF } from '../search/hybrid-search.js';
+import type { HybridSearchResult } from '../search/hybrid-search.js';
+import { embedText, isEmbedderReady } from '../search/embedder.js';
 import { planRename, formatRenameResult } from './rename.js';
 import type { RenameResult } from './rename.js';
 import { executeQuery as executeCypherQuery, formatResultAsMarkdown } from '../query/index.js';
@@ -58,6 +62,7 @@ export async function handleToolCall(
   args: Record<string, unknown> | undefined,
   graph: KnowledgeGraph,
   projectRoot?: string,
+  vectorStore?: VectorStore | null,
 ): Promise<string> {
   switch (name) {
     case 'recon_packages':
@@ -70,7 +75,7 @@ export async function handleToolCall(
       return handleContext(args, graph);
 
     case 'recon_query':
-      return handleQuery(args, graph);
+      return handleQuery(args, graph, vectorStore ?? null);
 
     case 'recon_detect_changes':
       return handleDetectChanges(args, graph);
@@ -444,10 +449,11 @@ function getSearchIndex(graph: KnowledgeGraph): BM25Index {
   return _searchIndex;
 }
 
-function handleQuery(
+async function handleQuery(
   args: Record<string, unknown> | undefined,
   graph: KnowledgeGraph,
-): string {
+  vectorStore: VectorStore | null,
+): Promise<string> {
   const rawQuery = args?.query as string;
   const typeFilter = args?.type as string;
   const pkgFilter = args?.package as string;
@@ -464,24 +470,56 @@ function handleQuery(
   const searchIndex = getSearchIndex(graph);
   const bm25Hits = searchIndex.search(rawQuery, limit * 3);
 
-  const seen = new Set<string>();
-  const matches: Array<{ node: Node; score: number }> = [];
+  // Attempt hybrid search if vector store is available
+  let hybridResults: HybridSearchResult[] | null = null;
+  if (vectorStore && vectorStore.size > 0) {
+    try {
+      const queryEmb = isEmbedderReady()
+        ? await embedText(rawQuery)
+        : null;
 
-  // Phase 1: BM25 results
-  for (const hit of bm25Hits) {
-    const node = graph.getNode(hit.nodeId);
-    if (!node) continue;
-    if (node.type === NodeType.File) continue;
-
-    if (typeFilter && node.type !== typeFilter) continue;
-    if (pkgFilter && !node.package.includes(pkgFilter)) continue;
-    if (langFilter && node.language !== langFilter) continue;
-
-    seen.add(node.id);
-    matches.push({ node, score: hit.score });
+      if (queryEmb) {
+        hybridResults = mergeWithRRF(bm25Hits, vectorStore.search(queryEmb, limit * 3), limit * 3);
+      }
+    } catch {
+      // Fall through to BM25-only
+    }
   }
 
-  // Phase 2: substring fallback for nodes BM25 missed
+  const seen = new Set<string>();
+  const matches: Array<{ node: Node; score: number; sources?: ('bm25' | 'semantic')[] }> = [];
+
+  if (hybridResults) {
+    // Use hybrid results
+    for (const hit of hybridResults) {
+      const node = graph.getNode(hit.nodeId);
+      if (!node) continue;
+      if (node.type === NodeType.File) continue;
+
+      if (typeFilter && node.type !== typeFilter) continue;
+      if (pkgFilter && !node.package.includes(pkgFilter)) continue;
+      if (langFilter && node.language !== langFilter) continue;
+
+      seen.add(node.id);
+      matches.push({ node, score: hit.score, sources: hit.sources });
+    }
+  } else {
+    // BM25-only path
+    for (const hit of bm25Hits) {
+      const node = graph.getNode(hit.nodeId);
+      if (!node) continue;
+      if (node.type === NodeType.File) continue;
+
+      if (typeFilter && node.type !== typeFilter) continue;
+      if (pkgFilter && !node.package.includes(pkgFilter)) continue;
+      if (langFilter && node.language !== langFilter) continue;
+
+      seen.add(node.id);
+      matches.push({ node, score: hit.score });
+    }
+  }
+
+  // Substring fallback for nodes both BM25 and hybrid missed
   for (const node of graph.nodes.values()) {
     if (seen.has(node.id)) continue;
     if (node.type === NodeType.File) continue;
@@ -505,20 +543,24 @@ function handleQuery(
   matches.sort((a, b) => b.score - a.score || a.node.name.localeCompare(b.node.name));
   const results = matches.slice(0, limit);
 
+  const searchMode = hybridResults ? 'hybrid (BM25 + semantic)' : 'BM25';
+
   const lines: string[] = [
     `# Query: "${args?.query}"`,
     '',
     `**Matches:** ${matches.length}${matches.length > limit ? ` (showing ${limit})` : ''}`,
+    `**Search:** ${searchMode}`,
     '',
   ];
 
-  for (const { node } of results) {
+  for (const { node, sources } of results) {
     const callerCount = graph.getIncoming(node.id, RelationshipType.CALLS).length;
     const calleeCount = graph.getOutgoing(node.id, RelationshipType.CALLS).length;
+    const srcTag = sources ? ` [${sources.join('+')}]` : '';
 
     lines.push(
       `- **${node.name}** (${node.type}) ??\`${node.file}:${node.startLine}\` | ${node.language} | ` +
-      `callers: ${callerCount}, callees: ${calleeCount}${node.exported ? '' : ' [unexported]'}`,
+      `callers: ${callerCount}, callees: ${calleeCount}${node.exported ? '' : ' [unexported]'}${srcTag}`,
     );
   }
 

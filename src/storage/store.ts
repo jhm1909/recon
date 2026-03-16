@@ -11,12 +11,14 @@ import { join, basename } from 'node:path';
 import { KnowledgeGraph } from '../graph/graph.js';
 import type { IndexMeta } from './types.js';
 import type { BM25Index } from '../search/bm25.js';
+import type { VectorStore } from '../search/vector-store.js';
 
 const RECON_DIR = '.recon';
 const REPOS_DIR = 'repos';
 const GRAPH_FILE = 'graph.json';
 const META_FILE = 'meta.json';
 const SEARCH_FILE = 'search.json';
+const EMBEDDINGS_FILE = 'embeddings.json';
 
 export interface StoredIndex {
   graph: KnowledgeGraph;
@@ -218,4 +220,44 @@ export async function loadAllRepos(projectRoot: string): Promise<{
   }
 
   return { graph: mergedGraph, repos };
+}
+
+/**
+ * Save vector embeddings to .recon/embeddings.json.
+ */
+export async function saveEmbeddings(
+  projectRoot: string,
+  vectorStore: VectorStore,
+  repoName?: string,
+): Promise<void> {
+  const dir = getRepoDir(projectRoot, repoName);
+
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+
+  const serialized = vectorStore.serialize();
+  await writeFile(join(dir, EMBEDDINGS_FILE), JSON.stringify(serialized), 'utf-8');
+}
+
+/**
+ * Load vector embeddings from .recon/embeddings.json.
+ * Returns null if no embeddings exist.
+ */
+export async function loadEmbeddings(
+  projectRoot: string,
+  repoName?: string,
+): Promise<VectorStore | null> {
+  const dir = getRepoDir(projectRoot, repoName);
+  const embPath = join(dir, EMBEDDINGS_FILE);
+
+  if (!existsSync(embPath)) return null;
+
+  try {
+    const raw = await readFile(embPath, 'utf-8');
+    const { VectorStore: VS } = await import('../search/vector-store.js');
+    return VS.deserialize(JSON.parse(raw));
+  } catch {
+    return null;
+  }
 }
