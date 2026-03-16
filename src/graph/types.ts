@@ -74,6 +74,7 @@ export interface Node {
   package: string;
   exported: boolean;
   repo?: string;            // Multi-repo: which repo this node belongs to
+  community?: string;       // Community detection: cluster label
 
   // Go-specific (optional)
   receiver?: string;       // Method receiver type

@@ -294,14 +294,28 @@ function handleImpact(
 
   const totalAffected = allSymbols.length;
 
+  // Collect affected communities
+  const affectedCommunities = new Set<string>();
+  if (targetNode.community) affectedCommunities.add(targetNode.community);
+  for (const sym of allSymbols) {
+    for (const node of graph.nodes.values()) {
+      if (node.name === sym.name && node.file === sym.file && node.community) {
+        affectedCommunities.add(node.community);
+      }
+    }
+  }
+
   // Format
   const lines: string[] = [
     `# Impact Analysis: ${targetNode.name}`,
     '',
-    `**Target:** ${targetNode.name} (${targetNode.type}) ??\`${targetNode.file}:${targetNode.startLine}\``,
+    `**Target:** ${targetNode.name} (${targetNode.type}) →\`${targetNode.file}:${targetNode.startLine}\``,
     `**Direction:** ${direction}`,
     `**Risk:** ${risk}`,
     `**Summary:** ${d1Count} direct ${direction === 'upstream' ? 'callers' : 'callees'}, ${totalAffected} total affected`,
+    ...(affectedCommunities.size > 0
+      ? [`**Affected communities:** ${Array.from(affectedCommunities).join(', ')} (${affectedCommunities.size})`]
+      : []),
     '',
   ];
 
@@ -386,6 +400,7 @@ function handleContext(
     `**Language:** ${node.language}`,
     `**Package:** ${node.package}`,
     `**Exported:** ${node.exported}`,
+    ...(node.community ? [`**Community:** ${node.community}`] : []),
     '',
   ];
 

@@ -18,6 +18,7 @@ import { startServer } from '../mcp/server.js';
 import { BM25Index } from '../search/bm25.js';
 import { analyzeTreeSitter } from '../analyzers/tree-sitter/index.js';
 import { getAvailableLanguages } from '../analyzers/tree-sitter/index.js';
+import { detectCommunities } from '../graph/community.js';
 
 /**
  * Find project root by walking up to find go.mod.
@@ -256,6 +257,16 @@ export async function indexCommand(options: { force?: boolean; repo?: string }):
       handler: r.handler,
     })),
   };
+
+  // Community detection
+  console.log('[recon] Detecting communities...');
+  const communityStats = detectCommunities(graph);
+  console.log(
+    `[recon] Communities: ${communityStats.communityCount} clusters in ${communityStats.iterations} iterations` +
+    (communityStats.largestCommunity.size > 0
+      ? ` (largest: ${communityStats.largestCommunity.label} with ${communityStats.largestCommunity.size} symbols)`
+      : ''),
+  );
 
   // Save
   // Stamp repo name on all nodes if multi-repo
