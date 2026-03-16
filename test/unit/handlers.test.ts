@@ -223,9 +223,11 @@ describe('recon_query handler', () => {
 
   it('exact match scores higher than substring', async () => {
     const result = await handleToolCall('recon_query', { query: 'DecodeJWT' }, graph);
-    // DecodeJWT should appear (exact match)
+    // DecodeJWT should appear first (exact name match via BM25)
     expect(result).toContain('DecodeJWT');
-    expect(result).toContain('**Matches:** 1');
+    // BM25 tokenizes "DecodeJWT" → ["decode", "jwt"], also matching jwt package
+    const lines = result.split('\n').filter(l => l.startsWith('- **'));
+    expect(lines[0]).toContain('DecodeJWT');
   });
 });
 

@@ -12,9 +12,10 @@ import { analyzeGoPackages, runGoList, getModulePath, analyzeGoSymbols } from '.
 import { analyzeTypeScript } from '../analyzers/ts-analyzer.js';
 import { buildCrossLanguageEdges, extractGoRoutes } from '../analyzers/cross-language.js';
 import type { APIRoute } from '../analyzers/cross-language.js';
-import { saveIndex, loadIndex } from '../storage/store.js';
+import { saveIndex, saveSearchIndex, loadIndex } from '../storage/store.js';
 import type { IndexMeta } from '../storage/types.js';
 import { startServer } from '../mcp/server.js';
+import { BM25Index } from '../search/bm25.js';
 
 /**
  * Find project root by walking up to find go.mod.
@@ -224,6 +225,12 @@ export async function indexCommand(options: { force?: boolean }): Promise<void> 
 
   // Save
   await saveIndex(projectRoot, graph, meta);
+
+  // Build and save BM25 search index
+  console.log('[recon] Building search index...');
+  const searchIndex = BM25Index.buildFromGraph(graph);
+  await saveSearchIndex(projectRoot, searchIndex);
+  console.log(`[recon] Search index: ${searchIndex.documentCount} documents`);
 
   console.log(
     `[recon] Indexed ${goPackages} Go packages, ${goSymbols} Go symbols, ` +

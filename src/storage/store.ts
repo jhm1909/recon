@@ -9,10 +9,12 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { KnowledgeGraph } from '../graph/graph.js';
 import type { IndexMeta } from './types.js';
+import type { BM25Index } from '../search/bm25.js';
 
 const RECON_DIR = '.recon';
 const GRAPH_FILE = 'graph.json';
 const META_FILE = 'meta.json';
+const SEARCH_FILE = 'search.json';
 
 export interface StoredIndex {
   graph: KnowledgeGraph;
@@ -69,4 +71,21 @@ export async function loadIndex(projectRoot: string): Promise<StoredIndex | null
   } catch {
     return null;
   }
+}
+
+/**
+ * Save BM25 search index to .recon/search.json.
+ */
+export async function saveSearchIndex(
+  projectRoot: string,
+  searchIndex: BM25Index,
+): Promise<void> {
+  const dir = join(projectRoot, RECON_DIR);
+
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+
+  const serialized = searchIndex.serialize();
+  await writeFile(join(dir, SEARCH_FILE), JSON.stringify(serialized), 'utf-8');
 }

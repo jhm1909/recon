@@ -8,6 +8,7 @@ import { execSync } from 'node:child_process';
 import { KnowledgeGraph } from '../graph/graph.js';
 import { NodeType, RelationshipType, Language } from '../graph/types.js';
 import type { Node, Relationship } from '../graph/types.js';
+import { BM25Index } from '../search/bm25.js';
 
 /**
  * Handle a tool call and return formatted text result.
@@ -360,38 +361,71 @@ function handleContext(
 
 // ??? recon_query ???????????????????????????????????????????????
 
+// Lazy-initialized BM25 index (rebuilt when graph size changes)
+let _searchIndex: BM25Index | null = null;
+let _searchGraphSize = -1;
+
+function getSearchIndex(graph: KnowledgeGraph): BM25Index {
+  if (_searchIndex && _searchGraphSize === graph.nodeCount) {
+    return _searchIndex;
+  }
+  _searchIndex = BM25Index.buildFromGraph(graph);
+  _searchGraphSize = graph.nodeCount;
+  return _searchIndex;
+}
+
 function handleQuery(
   args: Record<string, unknown> | undefined,
   graph: KnowledgeGraph,
 ): string {
-  const query = (args?.query as string)?.toLowerCase();
+  const rawQuery = args?.query as string;
   const typeFilter = args?.type as string;
   const pkgFilter = args?.package as string;
   const langFilter = args?.language as string;
   const limit = (args?.limit as number) || 20;
 
-  if (!query) throw new Error("'query' parameter is required.");
+  if (!rawQuery) throw new Error("'query' parameter is required.");
 
-  // Search
+  const queryLower = rawQuery.toLowerCase();
+
+  // BM25 search
+  const searchIndex = getSearchIndex(graph);
+  const bm25Hits = searchIndex.search(rawQuery, limit * 3);
+
+  const seen = new Set<string>();
   const matches: Array<{ node: Node; score: number }> = [];
 
-  for (const node of graph.nodes.values()) {
-    // Skip file/package nodes for symbol search
+  // Phase 1: BM25 results
+  for (const hit of bm25Hits) {
+    const node = graph.getNode(hit.nodeId);
+    if (!node) continue;
     if (node.type === NodeType.File) continue;
 
-    const nameLower = node.name.toLowerCase();
-    if (!nameLower.includes(query)) continue;
-
-    // Apply filters
     if (typeFilter && node.type !== typeFilter) continue;
     if (pkgFilter && !node.package.includes(pkgFilter)) continue;
     if (langFilter && node.language !== langFilter) continue;
 
-    // Score: exact > prefix > substring
-    let score = 1;
-    if (nameLower === query) score = 3;
-    else if (nameLower.startsWith(query)) score = 2;
+    seen.add(node.id);
+    matches.push({ node, score: hit.score });
+  }
 
+  // Phase 2: substring fallback for nodes BM25 missed
+  for (const node of graph.nodes.values()) {
+    if (seen.has(node.id)) continue;
+    if (node.type === NodeType.File) continue;
+
+    const nameLower = node.name.toLowerCase();
+    if (!nameLower.includes(queryLower)) continue;
+
+    if (typeFilter && node.type !== typeFilter) continue;
+    if (pkgFilter && !node.package.includes(pkgFilter)) continue;
+    if (langFilter && node.language !== langFilter) continue;
+
+    let score = 0.1;
+    if (nameLower === queryLower) score = 0.3;
+    else if (nameLower.startsWith(queryLower)) score = 0.2;
+
+    seen.add(node.id);
     matches.push({ node, score });
   }
 
