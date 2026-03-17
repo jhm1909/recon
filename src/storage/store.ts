@@ -48,7 +48,9 @@ function getRepoDir(projectRoot: string, repoName?: string): string {
  * Derive default repo name from a project root path.
  */
 export function defaultRepoName(projectRoot: string): string {
-  return basename(projectRoot);
+  // Handle both Unix and Windows path separators
+  const normalized = projectRoot.replace(/\\/g, '/');
+  return basename(normalized);
 }
 
 /**
