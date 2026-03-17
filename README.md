@@ -1,34 +1,106 @@
-# Recon
+<p align="center">
+  <img src="https://em-content.zobj.net/source/apple/391/microscope_1f52c.png" width="80" />
+</p>
 
-Lightweight code intelligence engine for AI agents. Builds a knowledge graph of **13 languages**, tracks cross-language API calls, detects code communities, and exposes 10 tools + 5 resources via [Model Context Protocol](https://modelcontextprotocol.io/) or HTTP REST API.
+<h1 align="center">Recon</h1>
 
-> Give your AI agent architectural awareness — dependency mapping, blast radius analysis, safe renames, community detection, Cypher-like graph queries, hybrid semantic search, execution flow tracing, multi-repo support, and call graph traversal without reading every file.
+<p align="center">
+  <strong>Code intelligence engine for AI agents</strong><br/>
+  Knowledge graph · 13 languages · MCP + REST · Interactive dashboard
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/recon-mcp"><img src="https://img.shields.io/npm/v/recon-mcp?style=flat-square&color=cb3837" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/recon-mcp"><img src="https://img.shields.io/npm/dm/recon-mcp?style=flat-square&color=blue" alt="npm downloads" /></a>
+  <a href="https://github.com/jhm1909/recon/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jhm1909/recon?style=flat-square" alt="license" /></a>
+  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-compatible-8A2BE2?style=flat-square" alt="MCP" /></a>
+  <img src="https://img.shields.io/badge/tests-410%20passed-brightgreen?style=flat-square" alt="tests" />
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#mcp-integration">MCP Setup</a> ·
+  <a href="#tool-reference">Tools</a> ·
+  <a href="#dashboard">Dashboard</a> ·
+  <a href="#mcp-prompts">Prompts</a>
+</p>
 
 ---
 
 ## Why Recon?
 
-AI coding agents are blind to architecture. They grep, they guess, they break things. Recon fixes this by indexing your codebase into a knowledge graph that agents can query through MCP:
+AI coding agents are **blind to architecture**. They grep, they guess, they break things.
 
-- **13 language support** — Go, TypeScript, Python, Rust, Java, C, C++, Ruby, PHP, C#, Kotlin, Swift via tree-sitter + dedicated analyzers
-- **Multi-repo indexing** — index multiple repositories, query across them or filter by repo
-- **Community detection** — automatic module clustering via label propagation to understand code architecture
-- **Blast radius before editing** — know what breaks before you touch it
-- **Graph-aware rename** — safe multi-file renames using the call graph, not find-and-replace
-- **Cypher-like graph queries** — structural queries with `MATCH`/`WHERE`/`RETURN` syntax
-- **BM25 ranked search** — keyword search with camelCase/snake_case tokenization and relevance scoring
-- **Hybrid semantic search** — optional vector embeddings (all-MiniLM-L6-v2) with Reciprocal Rank Fusion for BM25 + semantic results
-- **Process/flow detection** — automatic execution flow tracing from entry points through call chains
-- **HTTP REST API** — optional Express server (`recon serve --http`) wrapping all MCP tools as REST endpoints
-- **Cross-language tracing** — follow API calls from TypeScript frontend to Go backend
-- **MCP Resources** — structured data via `recon://` URIs for packages, symbols, files, processes, and stats
+Recon fixes this by indexing your codebase into a **knowledge graph** — functions, classes, call chains, imports, communities — and exposing it through **11 MCP tools**, **3 prompts**, and **5 resources** that any AI agent can query.
+
+> 💡 **One command, full awareness.** Your agent gets dependency mapping, blast radius analysis, safe renames, execution flow tracing, Cypher queries, and hybrid semantic search — without reading every file.
+
+---
+
+## Quick Start
+
+```bash
+# Index your project (zero config)
+cd /path/to/your/project
+npx recon-mcp index
+
+# Start MCP server for AI agents
+npx recon-mcp serve
+
+# Or start HTTP REST API + interactive dashboard
+npx recon-mcp serve --http
+# → http://localhost:3100
+```
+
+**Global install** (optional):
+
+```bash
+npm install -g recon-mcp
+recon index && recon serve
+```
+
+> Requires **Node.js ≥ 20**. Tree-sitter grammars are bundled as npm dependencies.
+
+---
+
+## Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🔍 Code Intelligence
+- **13 languages** via tree-sitter + dedicated analyzers
+- **Multi-repo** indexing and cross-repo queries
+- **Community detection** — automatic module clustering (label propagation)
+- **Blast radius** — know what breaks before you touch it
+- **Graph-aware rename** — safe multi-file renames
+- **Execution flow tracing** — BFS from entry points through call chains
+- **Cross-language tracing** — follow API calls across Go ↔ TypeScript
+
+</td>
+<td width="50%">
+
+### ⚡ Search & Query
+- **BM25 search** — camelCase/snake_case tokenization with relevance ranking
+- **Hybrid semantic search** — vector embeddings (all-MiniLM-L6-v2) + RRF fusion
+- **Cypher-like queries** — `MATCH`/`WHERE`/`RETURN` structural queries
+- **MCP Resources** — `recon://` URIs for packages, symbols, files, processes, stats
+- **MCP Prompts** — guided workflows for impact analysis, architecture docs, onboarding
+- **Framework detection** — automatic entry point multipliers for 20+ frameworks
 - **Incremental indexing** — sub-second re-index on file changes
-- **Zero config** — point it at a repo, run `npx recon index`, done
+
+</td>
+</tr>
+</table>
+
+---
 
 ## Supported Languages
 
 | Language | Analyzer | What's indexed |
-|----------|----------|---------------|
+|----------|----------|----------------|
 | **Go** | Tree-sitter + dedicated | Packages, functions, methods, structs, interfaces, call graph, imports |
 | **TypeScript** | Dedicated (Compiler API) | Modules, components, functions, types, JSX usage, imports |
 | **Python** | Tree-sitter | Classes, functions, methods, inheritance, imports, calls |
@@ -43,168 +115,19 @@ AI coding agents are blind to architecture. They grep, they guess, they break th
 | **Swift** | Tree-sitter (optional) | Classes, structs, enums, functions, import declarations, calls |
 | **Cross-language** | Route matching | HTTP API routes mapped from Go handlers to TypeScript consumers |
 
-Kotlin and Swift grammars are optional dependencies — install them with `npm install tree-sitter-kotlin tree-sitter-swift` if needed.
+> Kotlin and Swift require optional grammars: `npm install tree-sitter-kotlin tree-sitter-swift`
 
-## Architecture
+---
 
-```
-├── bin/recon                # CLI entry point
-├── src/
-│   ├── analyzers/
-│   │   ├── ts-analyzer.ts   # TypeScript/React component extraction
-│   │   ├── cross-language.ts # Go route ↔ TS API call matching
-│   │   ├── tree-sitter/     # Multi-language tree-sitter analyzer
-│   │   │   ├── parser.ts    #   Grammar loading + language detection
-│   │   │   ├── queries.ts   #   S-expression queries (13 languages)
-│   │   │   ├── extractor.ts #   Symbol/call/import/heritage extraction
-│   │   │   ├── analyzer.ts  #   File walker + incremental indexing
-│   │   │   └── index.ts     #   Module barrel
-│   │   └── types.ts         # Shared analyzer interfaces
-│   ├── graph/
-│   │   ├── graph.ts         # KnowledgeGraph — in-memory Map + adjacency index
-│   │   ├── community.ts     # Label propagation community detection
-│   │   ├── process.ts       # Execution flow detection (BFS from entry points)
-│   │   └── types.ts         # Node, Relationship, enums
-│   ├── mcp/
-│   │   ├── server.ts        # MCP server (stdio transport)
-│   │   ├── tools.ts         # Tool definitions (JSON Schema)
-│   │   ├── handlers.ts      # Tool dispatch + query logic
-│   │   ├── hints.ts         # Next-step hints appended to responses
-│   │   ├── instructions.ts  # AI agent instructions (injected into system prompt)
-│   │   ├── rename.ts        # Graph-aware multi-file rename
-│   │   └── resources.ts     # MCP Resources (recon:// URIs)
-│   ├── query/
-│   │   ├── parser.ts        # Simplified Cypher DSL parser
-│   │   ├── executor.ts      # Query execution + markdown formatting
-│   │   └── index.ts         # Module barrel
-│   ├── search/
-│   │   ├── bm25.ts          # Standalone BM25 search index
-│   │   ├── embedder.ts      # Vector embeddings (all-MiniLM-L6-v2)
-│   │   ├── vector-store.ts  # In-memory cosine similarity store
-│   │   ├── hybrid-search.ts # BM25 + vector RRF fusion
-│   │   ├── text-generator.ts# Embedding text generator
-│   │   └── index.ts         # Module barrel
-│   ├── storage/
-│   │   ├── store.ts         # JSON file I/O (.recon/ + multi-repo)
-│   │   └── types.ts         # IndexMeta, IndexStats
-│   ├── server/
-│   │   └── http.ts          # Express HTTP REST API server
-│   ├── utils/
-│   │   └── hash.ts          # SHA-256 file hashing
-│   └── cli/
-│       ├── index.ts         # Commander CLI setup
-│       └── commands.ts      # index, serve, status, clean commands
-```
+## MCP Integration
 
-### Data Flow
+Add to your AI agent's MCP config to give it architectural awareness:
 
-```
-  TS Compiler API → components ─┐
-  tree-sitter → 13 languages   ├─→ KnowledgeGraph ─→ .recon/graph.json
-  router.go → API routes       ─┤   (in-memory)   ─→ .recon/meta.json
-  label propagation → clusters ─┤   + BM25 Index   ─→ .recon/search.json
-  BFS → execution flows        ─┘   + Communities  ─→ .recon/embeddings.json
-                                     + Embeddings
-                                     + Processes
-                                          │
-                                ┌─────────┴──────────┐
-                           MCP Server (stdio)   HTTP REST API
-                           ┌────┴────┐          (:3100)
-                        10 Tools   5 Resources
-                           │         │
-                     ┌─────┼─────┐   recon://packages
-                     │     │     │   recon://symbol/{name}
-                 Claude   Cursor  …   recon://file/{path}
-                  Code   Antigravity  recon://process/{name}
-                                      recon://stats
-```
+<table>
+<tr>
+<td>
 
-## Installation
-
-### Quick Start (npx — no install needed)
-
-```bash
-# Index your project
-cd /path/to/your/project
-npx recon-mcp index
-
-# Start MCP server (auto-indexes if needed)
-npx recon-mcp serve
-```
-
-### Global Install
-
-```bash
-npm install -g recon-mcp
-
-# Then use anywhere
-recon index
-recon serve
-```
-
-### From Source
-
-```bash
-git clone https://github.com/jhm1909/recon.git
-cd recon
-npm install
-npm run build
-```
-
-Requires Node.js >= 20. Tree-sitter grammars for all supported languages are installed as npm dependencies. Kotlin and Swift grammars are optional (`npm install tree-sitter-kotlin tree-sitter-swift`).
-
-## Usage
-
-### CLI Commands
-
-```bash
-# Index the codebase (incremental by default)
-npx recon index
-
-# Force full re-index
-npx recon index --force
-
-# Index as a named repo (multi-repo support)
-npx recon index --repo my-backend
-
-# Index with vector embeddings for semantic search
-npx recon index --embeddings
-
-# Show index status
-npx recon status
-
-# Show status for a specific repo
-npx recon status --repo my-backend
-
-# Start MCP server on stdio (auto-indexes if needed)
-npx recon-mcp serve
-
-# Start without auto-indexing (use existing index)
-npx recon-mcp serve --no-index
-
-# Start MCP server for a specific repo only
-npx recon-mcp serve --repo my-backend
-
-# Start HTTP REST API server instead of MCP
-npx recon-mcp serve --http
-
-# Start HTTP REST API on a custom port (default: 3100)
-npx recon-mcp serve --http --port 8080
-
-# Delete index
-npx recon-mcp clean
-
-# Delete index for a specific repo only
-npx recon-mcp clean --repo my-backend
-```
-
-> **Auto-index:** `serve` automatically checks if the index exists and is up-to-date with the current Git commit. If not, it runs `index` automatically before starting. Use `--no-index` to skip this check.
-
-### MCP Integration
-
-Add to your AI agent's MCP config to give it code intelligence:
-
-**Claude Code** (`.claude/mcp.json`):
+**Claude Code** (`.claude/mcp.json`)
 
 ```json
 {
@@ -218,7 +141,10 @@ Add to your AI agent's MCP config to give it code intelligence:
 }
 ```
 
-**Cursor** (`.cursor/mcp.json`):
+</td>
+<td>
+
+**Cursor** (`.cursor/mcp.json`)
 
 ```json
 {
@@ -231,6 +157,10 @@ Add to your AI agent's MCP config to give it code intelligence:
   }
 }
 ```
+
+</td>
+</tr>
+</table>
 
 **Antigravity** (`mcp_config.json`):
 
@@ -246,195 +176,134 @@ Add to your AI agent's MCP config to give it code intelligence:
 }
 ```
 
-> **Server Instructions:** Recon includes built-in MCP instructions that are automatically injected into the AI agent's system prompt. The agent will know when to use `recon_impact` before editing, `recon_context` for exploration, etc. — no manual configuration needed.
-```
+> **Built-in Instructions:** Recon automatically injects [MCP server instructions](https://modelcontextprotocol.io/docs/concepts/server-instructions) into the agent's system prompt. The agent will proactively use `recon_impact` before editing, `recon_context` for exploration, and `recon_rename` for safe renames — no manual prompting needed.
 
-## Multi-Repo Support
+---
 
-Recon can index and serve multiple repositories from a single `.recon/` directory:
+## CLI Commands
 
 ```bash
-# Index different repos
-cd /path/to/backend && npx recon index --repo backend
-cd /path/to/frontend && npx recon index --repo frontend
+recon index                        # Index codebase (incremental)
+recon index --force                # Force full re-index
+recon index --repo my-backend      # Index as named repo (multi-repo)
+recon index --embeddings           # Include vector embeddings for semantic search
 
-# Serve all repos (merged graph)
-npx recon serve
+recon serve                        # Start MCP server on stdio (auto-indexes)
+recon serve --http                 # Start HTTP REST API + dashboard on :3100
+recon serve --http --port 8080     # Custom port
+recon serve --no-index             # Skip auto-indexing
+recon serve --repo my-backend      # Serve specific repo only
 
-# Or serve a single repo
-npx recon serve --repo backend
+recon status                       # Show index stats
+recon status --repo my-backend     # Status for specific repo
+recon clean                        # Delete index
 ```
 
-When serving multiple repos, all MCP tools accept an optional `repo` parameter to filter results to a specific repository. Use `recon_list_repos` to discover which repos are indexed.
+> **Auto-index:** `serve` checks if the index is up-to-date with the current Git commit. If stale, it re-indexes automatically before starting. Use `--no-index` to skip.
 
-Per-repo indices are stored under `.recon/repos/{repoName}/`. Legacy single-repo indices (without `--repo`) continue to work unchanged.
-
-## Community Detection
-
-After indexing, Recon automatically detects code communities using the **Label Propagation Algorithm (LPA)**. Densely connected symbols are clustered into modules, giving agents architectural awareness beyond package boundaries.
-
-- Each non-structural node (functions, structs, classes, etc.) gets a `community` label
-- Communities are named after the most common package in each cluster
-- `recon_context` shows which community a symbol belongs to
-- `recon_impact` lists affected communities in the risk summary for cross-module awareness
-
-Community detection runs automatically during indexing — no configuration needed.
+---
 
 ## Tool Reference
 
-All tools accept an optional `repo` parameter to filter by repository when using multi-repo indexing.
+All 11 tools accept an optional `repo` parameter for multi-repo filtering.
 
 ### recon_packages
 
-List all packages (Go) and modules (TypeScript) with dependency relationships.
+List all packages/modules with dependency relationships.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `language` | `"go" \| "typescript" \| "all"` | Filter by language (default: `"all"`) |
-| `repo` | `string` | Filter by repo name |
+```
+recon_packages(language?: "go" | "typescript" | "all")
+```
 
 ### recon_query
 
-Search the knowledge graph for symbols by name or pattern. Uses BM25 ranked search with automatic camelCase/snake_case tokenization — `"AuthMiddle"` finds `AuthMiddleware`, and exact names rank highest. Falls back to substring matching when BM25 returns no results. Enable `semantic: true` for hybrid BM25 + vector search with Reciprocal Rank Fusion (requires `--embeddings` during indexing).
+BM25 ranked search with automatic camelCase/snake_case tokenization. Exact names rank highest. Supports optional hybrid BM25 + vector search with Reciprocal Rank Fusion.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `query` | `string` | **Required.** Name or substring to search (case-insensitive) |
-| `type` | `string` | Filter: `Function`, `Method`, `Struct`, `Interface`, `Component`, `Type`, `Package`, `Class`, `Enum`, `Trait` |
-| `package` | `string` | Filter by package path substring |
-| `language` | `"go" \| "typescript" \| "python" \| "rust" \| "java" \| "c" \| "cpp"` | Filter by language |
-| `semantic` | `boolean` | Use hybrid BM25 + vector search (default: `false`) |
-| `limit` | `number` | Max results (default: 20) |
-| `repo` | `string` | Filter by repo name |
+```
+recon_query(query: string, type?: string, language?: string, semantic?: boolean, limit?: number)
+```
 
 ### recon_context
 
-360-degree view of a single symbol — callers, callees, imports, methods, implementations, and community membership.
+360° view of a symbol — callers, callees, imports, methods, implementations, community membership.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `name` | `string` | **Required.** Symbol name (e.g., `"Button"`, `"Handler.GetGuild"`) |
-| `file` | `string` | Disambiguate when multiple symbols share a name |
-| `includeSource` | `boolean` | Include source code (default: `false`) |
-| `repo` | `string` | Filter by repo name |
+```
+recon_context(name: string, file?: string, includeSource?: boolean)
+```
 
 ### recon_impact
 
-Blast radius analysis — what breaks if you change a symbol. Includes affected communities in the risk summary.
+Blast radius analysis — what breaks if you change a symbol. Includes affected communities and confidence tiers.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `target` | `string` | **Required.** Symbol to analyze |
-| `direction` | `"upstream" \| "downstream"` | **Required.** Callers or callees |
-| `maxDepth` | `number` | Traversal depth (default: 3) |
-| `includeTests` | `boolean` | Include test files (default: `false`) |
-| `relationTypes` | `string[]` | Filter edges: `CALLS`, `IMPORTS`, `HAS_METHOD`, `IMPLEMENTS`, `USES_COMPONENT`, `CALLS_API`, `EXTENDS` |
-| `minConfidence` | `number` | Confidence threshold 0.0-1.0 (default: 0.0) |
-| `file` | `string` | Disambiguate by file path substring |
-| `repo` | `string` | Filter by repo name |
+```
+recon_impact(target: string, direction: "upstream" | "downstream", maxDepth?: number)
+```
 
-**Risk levels:** LOW (0-2 d1), MEDIUM (3-9), HIGH (10-19), CRITICAL (20+ or cross-app)
+**Risk levels:** `LOW` (0–2 d1) · `MEDIUM` (3–9) · `HIGH` (10–19) · `CRITICAL` (20+ or cross-app)
 
 ### recon_detect_changes
 
 Map git diff to affected symbols and trace blast radius.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `scope` | `"unstaged" \| "staged" \| "all" \| "branch"` | What to analyze (default: `"all"`) |
-| `base` | `string` | Base branch for `"branch"` scope (default: `"main"`) |
-| `repo` | `string` | Filter by repo name |
+```
+recon_detect_changes(scope?: "unstaged" | "staged" | "all" | "branch", base?: string)
+```
 
 ### recon_api_map
 
-Cross-language API route map — endpoint -> Go handler -> TypeScript consumers.
+Cross-language API route map — endpoint → Go handler → TypeScript consumers.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `method` | `string` | Filter by HTTP method |
-| `pattern` | `string` | Filter by URL pattern substring |
-| `handler` | `string` | Filter by handler name substring |
-| `repo` | `string` | Filter by repo name |
+```
+recon_api_map(method?: string, pattern?: string, handler?: string)
+```
 
 ### recon_rename
 
-Safe multi-file rename using the knowledge graph. Traces callers, importers, method owners, and component users to generate a confidence-tagged edit plan. Safer than find-and-replace because it understands the call graph.
+Safe multi-file rename using the knowledge graph. Each edit is tagged with confidence: **`graph`** (high, safe to accept) or **`text_search`** (review carefully).
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `symbol_name` | `string` | **Required.** Current name of the symbol |
-| `new_name` | `string` | **Required.** New name for the symbol |
-| `file` | `string` | Disambiguate when multiple symbols share a name |
-| `dry_run` | `boolean` | Preview edits without applying (default: `true`) |
-| `repo` | `string` | Filter by repo name |
-
-Each edit is tagged with a confidence level:
-- **`graph`** — found via knowledge graph relationship (high confidence, safe to accept)
-- **`text_search`** — found via name matching (lower confidence, review carefully)
-
-**Usage:** Run with `dry_run: true` first (default) to preview the edit plan, then `dry_run: false` to apply.
+```
+recon_rename(symbol_name: string, new_name: string, dry_run?: boolean)
+```
 
 ### recon_query_graph
 
-Execute structural queries against the knowledge graph using a simplified Cypher-like syntax. Returns results as a markdown table.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `query` | `string` | **Required.** Cypher-like query (`MATCH...WHERE...RETURN...LIMIT`) |
-| `limit` | `number` | Max rows to return (default: 50) |
-| `repo` | `string` | Filter by repo name |
-
-**Supported syntax:**
+Cypher-like structural queries against the knowledge graph.
 
 ```cypher
--- Find all classes
-MATCH (c:Class) RETURN c.name, c.file
-
--- Find callers of a function
 MATCH (a)-[:CALLS]->(b:Function) WHERE b.name = 'main' RETURN a.name, a.file
-
--- Find methods of a struct
-MATCH (s:Struct)-[:HAS_METHOD]->(m:Method) WHERE s.name = 'Config' RETURN m.name, m.file
-
--- Find class inheritance
+MATCH (s:Struct)-[:HAS_METHOD]->(m:Method) WHERE s.name = 'Config' RETURN m.name
 MATCH (child:Class)-[:EXTENDS]->(parent:Class) RETURN child.name, parent.name
-
--- Find exported functions in a package
-MATCH (f:Function) WHERE f.package CONTAINS 'auth' AND f.exported = 'true' RETURN f.name, f.file
-
--- Find interface implementations
-MATCH (s:Struct)-[:IMPLEMENTS]->(i:Interface) RETURN s.name, i.name
 ```
 
-**Node types:** `Package`, `File`, `Function`, `Method`, `Struct`, `Interface`, `Module`, `Component`, `Type`, `Class`, `Enum`, `Trait`
+**Node types:** `Package` · `File` · `Function` · `Method` · `Struct` · `Interface` · `Module` · `Component` · `Type` · `Class` · `Enum` · `Trait`
 
-**Edge types:** `CONTAINS`, `DEFINES`, `CALLS`, `IMPORTS`, `HAS_METHOD`, `IMPLEMENTS`, `USES_COMPONENT`, `CALLS_API`, `EXTENDS`
-
-**WHERE operators:** `=`, `<>`, `CONTAINS`, `STARTS WITH` (all case-insensitive)
-
-**Node properties:** `id`, `type`, `name`, `file`, `startLine`, `endLine`, `language`, `package`, `exported`, `repo`, `community`
+**Edge types:** `CONTAINS` · `DEFINES` · `CALLS` · `IMPORTS` · `HAS_METHOD` · `IMPLEMENTS` · `USES_COMPONENT` · `CALLS_API` · `EXTENDS`
 
 ### recon_list_repos
 
-List all indexed repositories with their stats.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| *(none)* | | Lists all repos with node/relationship counts, git info, and index time |
+List all indexed repositories with node/relationship counts and git info.
 
 ### recon_processes
 
-Detect execution flows by tracing call chains from entry points (HTTP handlers, exported functions, root nodes). Returns processes sorted by complexity.
+Detect execution flows by tracing call chains from entry points. Sorted by complexity.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `limit` | `number` | Max processes to return (default: 20) |
-| `filter` | `string` | Filter by process name substring |
-| `repo` | `string` | Filter by repo name |
+```
+recon_processes(limit?: number, filter?: string)
+```
+
+### recon_augment
+
+Compact symbol context for AI augmentation — returns callers, callees, processes, and community in one concise block.
+
+```
+recon_augment(pattern: string)
+```
+
+---
 
 ## MCP Resources
 
-Recon exposes structured data via `recon://` URIs that MCP clients can read directly.
+Structured data via `recon://` URIs — agents READ these without making a tool call.
 
 | Resource | URI | Description |
 |----------|-----|-------------|
@@ -444,71 +313,185 @@ Recon exposes structured data via `recon://` URIs that MCP clients can read dire
 | File Symbols | `recon://file/{path}` | All symbols in a file with types and line ranges |
 | Process Trace | `recon://process/{name}` | Execution flow trace from entry point through call chain |
 
-**Example:** An agent can `READ recon://stats` to get an overview of the indexed codebase, `READ recon://symbol/AuthMiddleware` to see all callers and callees, or `READ recon://process/HandleLogin` to trace an execution flow — all without making a tool call.
+---
+
+## MCP Prompts
+
+Three guided workflows that instruct AI agents step-by-step using Recon's tools:
+
+| Prompt | Description | Usage |
+|--------|-------------|-------|
+| **`detect_impact`** | Pre-commit change analysis → risk report | `detect_impact(scope: "staged")` |
+| **`generate_map`** | Architecture documentation with mermaid diagrams | `generate_map()` |
+| **`onboard`** | New developer onboarding guide | `onboard(focus: "auth")` |
+
+Each prompt returns a structured message with step-by-step instructions. The agent receives the message and autonomously executes each step using Recon tools.
+
+---
+
+## Dashboard
+
+Start the HTTP server to access the interactive code intelligence dashboard:
+
+```bash
+recon serve --http  # → http://localhost:3100
+```
+
+**Features:**
+- 🔹 **Graph Tab** — Force-directed knowledge graph with type-colored nodes, community coloring toggle, and click-to-inspect
+- 🔹 **Processes Tab** — Execution flow viewer with call chains, branch counts, and community tags
+- 🔹 **Impact Tab** — Interactive blast radius analysis with risk levels and confidence tiers
+- 🔹 **Live Search** — Debounced search dropdown (200ms) with keyboard navigation (↑↓ Enter Esc)
+- 🔹 **Graph Legend** — Node type → shape/color mapping
+- 🔹 **Package Sidebar** — Filter graph by package with symbol counts
+
+---
+
+## Multi-Repo Support
+
+Index and query multiple repositories from a single `.recon/` directory:
+
+```bash
+cd /path/to/backend && recon index --repo backend
+cd /path/to/frontend && recon index --repo frontend
+
+recon serve                  # Serve all repos (merged graph)
+recon serve --repo backend   # Serve single repo
+```
+
+All tools accept an optional `repo` parameter. Use `recon_list_repos` to discover indexed repos. Per-repo indices are stored under `.recon/repos/{repoName}/`.
+
+---
 
 ## Search
 
-`recon_query` uses a standalone BM25 ranking algorithm for relevance-scored search:
+### BM25 Keyword Search
 
-- **Tokenizer** splits camelCase, PascalCase, snake_case, and digit boundaries (`base64Decode` → `["base", "64", "decode"]`)
-- **Name boost** — symbol names are weighted 3x higher than file paths and packages
-- **IDF scoring** — rare terms rank higher than common ones
-- **Lazy initialization** — the BM25 index is built on first query and cached; invalidated when the graph changes
-- **Fallback** — when BM25 returns no results, falls back to case-insensitive substring matching
-
-The search index is persisted to `.recon/search.json` during indexing for fast cold starts.
+- **Tokenizer** splits camelCase, PascalCase, snake_case, digit boundaries (`base64Decode` → `["base", "64", "decode"]`)
+- **Name boost** — symbol names weighted 3× higher than file paths
+- **IDF scoring** — rare terms rank higher
+- **Fallback** — substring matching when BM25 returns nothing
 
 ### Hybrid Semantic Search
 
-When indexed with `--embeddings`, `recon_query` supports hybrid search combining BM25 keyword ranking with vector similarity:
+Enable with `recon index --embeddings`, then use `recon_query({query: "...", semantic: true})`.
 
-- **Model:** `Xenova/all-MiniLM-L6-v2` (384-dimensional embeddings via `@huggingface/transformers`)
-- **Fusion:** Reciprocal Rank Fusion (RRF) merges BM25 and vector results with `score = 1/(k + rank)`, k=60
-- **Usage:** Pass `semantic: true` to `recon_query` to activate hybrid mode
-- **Storage:** Embeddings persisted to `.recon/embeddings.json`
+- **Model:** `Xenova/all-MiniLM-L6-v2` (384-dim embeddings via `@huggingface/transformers`)
+- **Fusion:** Reciprocal Rank Fusion (RRF) — `score = 1/(k + rank)`, k=60
+- **Storage:** Persisted to `.recon/embeddings.json`
 
-Install `@huggingface/transformers` (listed as optional dependency) for semantic search support. The model is downloaded on first use.
+---
 
-## Incremental Indexing
+## Architecture
 
-Files are hashed with SHA-256. On re-index, only changed files are re-analyzed:
+```
+├── src/
+│   ├── analyzers/
+│   │   ├── ts-analyzer.ts        # TypeScript/React extraction (Compiler API)
+│   │   ├── cross-language.ts     # Go route ↔ TS API call matching
+│   │   ├── framework-detection.ts # 20+ framework entry point detection
+│   │   └── tree-sitter/          # Multi-language tree-sitter analyzer
+│   ├── graph/
+│   │   ├── graph.ts              # KnowledgeGraph — in-memory Map + adjacency
+│   │   ├── community.ts          # Label propagation community detection
+│   │   └── process.ts            # Execution flow detection (BFS)
+│   ├── mcp/
+│   │   ├── server.ts             # MCP server (stdio transport)
+│   │   ├── tools.ts              # 11 tool definitions (JSON Schema)
+│   │   ├── handlers.ts           # Tool dispatch + query logic
+│   │   ├── prompts.ts            # 3 MCP prompt templates
+│   │   ├── hints.ts              # Next-step hints for agent guidance
+│   │   ├── instructions.ts       # AI agent instructions (system prompt)
+│   │   ├── augmentation.ts       # Compact context injection
+│   │   ├── staleness.ts          # Index freshness check
+│   │   ├── rename.ts             # Graph-aware multi-file rename
+│   │   └── resources.ts          # MCP Resources (recon:// URIs)
+│   ├── search/
+│   │   ├── bm25.ts               # BM25 search index
+│   │   ├── hybrid-search.ts      # BM25 + vector RRF fusion
+│   │   └── vector-store.ts       # In-memory cosine similarity
+│   ├── query/
+│   │   ├── parser.ts             # Cypher DSL parser
+│   │   └── executor.ts           # Query execution + formatting
+│   ├── server/
+│   │   └── http.ts               # Express HTTP REST API + dashboard
+│   ├── dashboard/                # Interactive web dashboard
+│   │   ├── index.html
+│   │   ├── style.css
+│   │   └── app.js
+│   └── cli/
+│       ├── index.ts              # Commander CLI
+│       └── commands.ts           # index, serve, status, clean
+```
 
-- **TypeScript**: per-file granularity — only re-parse changed `.ts`/`.tsx` files
-- **Tree-sitter languages**: per-file granularity — only re-parse changed source files
-- Unchanged symbols are carried over from the previous index
-- `serve` auto-detects stale indexes by comparing Git commit hashes
+### Data Flow
 
-Force full re-index with `--force` if the graph seems stale.
+```
+  TS Compiler API → components ─┐
+  tree-sitter → 13 languages   ├─→ KnowledgeGraph ─→ .recon/graph.json
+  router.go → API routes       ─┤   (in-memory)   ─→ .recon/meta.json
+  label propagation → clusters ─┤   + BM25 Index   ─→ .recon/search.json
+  BFS → execution flows        ─┘   + Communities  ─→ .recon/embeddings.json
+                                     + Embeddings
+                                     + Processes
+                                          │
+                                ┌─────────┴──────────┐
+                           MCP Server (stdio)   HTTP REST API
+                         ┌───┴────┐────┐        (:3100 + Dashboard)
+                     11 Tools  3 Prompts  5 Resources
+                         │        │      recon://packages
+                   ┌─────┼────┐   │      recon://symbol/{name}
+                   │     │    │   │      recon://file/{path}
+               Claude  Cursor …   │      recon://process/{name}
+                Code  Antigravity │      recon://stats
+                                  │
+                          detect_impact
+                          generate_map
+                          onboard
+```
+
+---
+
+## HTTP REST API
+
+```bash
+recon serve --http              # Listen on :3100
+recon serve --http --port 8080  # Custom port
+```
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/health` | Health check + index stats |
+| `GET` | `/api/tools` | List available tools with schemas |
+| `POST` | `/api/tools/:name` | Execute a tool (body = JSON params) |
+| `GET` | `/api/resources` | List MCP resources + templates |
+| `GET` | `/api/resources/read?uri=...` | Read resource by URI |
+
+```bash
+# Search for a symbol
+curl -X POST http://localhost:3100/api/tools/recon_query \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "AuthMiddleware"}'
+
+# Read a resource
+curl 'http://localhost:3100/api/resources/read?uri=recon://symbol/AuthMiddleware'
+```
+
+CORS enabled by default for browser clients.
+
+---
 
 ## Graph Schema
-
-### Node Types
-
-| Type | ID Pattern | Language |
-|------|-----------|----------|
-| Package | `go:pkg:{importPath}` | Go |
-| File | `go:file:{path}` / `ts:file:{path}` | Both |
-| Function | `go:func:{pkg}.{name}` / `ts:func:{path}:{name}` | Both |
-| Method | `go:method:{pkg}.{recv}.{name}` | Go |
-| Struct | `go:struct:{pkg}.{name}` | Go |
-| Interface | `go:iface:{pkg}.{name}` / `ts:iface:{path}:{name}` | Both |
-| Component | `ts:comp:{path}:{name}` | TS |
-| Type | `ts:type:{path}:{name}` | TS |
-| Class | `py:class:{path}:{name}:{line}` | Python, Java, C++, Ruby, PHP, C#, Kotlin, Swift |
-| Enum | `rs:enum:{path}:{name}:{line}` | Rust, Java, C, C++, C#, Kotlin, Swift |
-| Trait | `rs:trait:{path}:{name}:{line}` | Rust |
-| Module | `py:mod:{path}:{name}:{line}` | Python |
 
 ### Node Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `id` | `string` | Unique node identifier |
-| `type` | `NodeType` | One of the node types above |
+| `type` | `NodeType` | Function, Method, Struct, Interface, Class, etc. |
 | `name` | `string` | Symbol name |
 | `file` | `string` | Source file path |
-| `startLine` | `number` | Start line in file |
-| `endLine` | `number` | End line in file |
+| `startLine` / `endLine` | `number` | Line range in file |
 | `language` | `Language` | Source language |
 | `package` | `string` | Package/module path |
 | `exported` | `boolean` | Whether the symbol is exported |
@@ -519,15 +502,17 @@ Force full re-index with `--force` if the graph seems stale.
 
 | Type | Meaning | Confidence |
 |------|---------|------------|
-| CONTAINS | Package/Module -> File | 1.0 |
-| DEFINES | File -> Symbol | 1.0 |
-| CALLS | Function -> Function | 0.5-1.0 |
-| IMPORTS | Package -> Package / File -> File | 1.0 |
-| HAS_METHOD | Struct/Class -> Method | 1.0 |
-| IMPLEMENTS | Struct -> Interface / Class -> Trait | 0.8-0.9 |
-| EXTENDS | Class -> Class (inheritance) | 0.9 |
-| USES_COMPONENT | Component -> Component (JSX) | 0.9 |
-| CALLS_API | TS Function -> Go Handler (cross-language) | 0.85-0.95 |
+| `CONTAINS` | Package/Module → File | 1.0 |
+| `DEFINES` | File → Symbol | 1.0 |
+| `CALLS` | Function → Function | 0.5–1.0 |
+| `IMPORTS` | Package → Package / File → File | 1.0 |
+| `HAS_METHOD` | Struct/Class → Method | 1.0 |
+| `IMPLEMENTS` | Struct → Interface / Class → Trait | 0.8–0.9 |
+| `EXTENDS` | Class → Class (inheritance) | 0.9 |
+| `USES_COMPONENT` | Component → Component (JSX) | 0.9 |
+| `CALLS_API` | TS Function → Go Handler (cross-language) | 0.85–0.95 |
+
+---
 
 ## Testing
 
@@ -536,71 +521,48 @@ npm test           # Run all tests
 npx vitest --watch # Watch mode
 ```
 
-355 tests covering:
+**410 tests** across **14 test suites:**
 
-| Suite | Tests | What's covered |
-|-------|-------|----------------|
+| Suite | Tests | Coverage |
+|-------|-------|----------|
 | `graph.test.ts` | 23 | KnowledgeGraph API — add, query, remove, serialize |
-| `handlers.test.ts` | 30 | MCP tool dispatch with 9-node mock graph |
+| `handlers.test.ts` | 30 | MCP tool dispatch with mock graph |
 | `search.test.ts` | 27 | BM25 tokenizer, ranking, serialization |
-| `rename.test.ts` | 28 | Graph-aware rename planning, disambiguation, formatting |
+| `rename.test.ts` | 28 | Graph-aware rename, disambiguation, formatting |
 | `resources.test.ts` | 35 | Resource URI parsing, all 5 resource types |
-| `tree-sitter.test.ts` | 58 | Multi-language extraction, graph construction, cross-language consistency |
-| `query.test.ts` | 47 | Cypher parser, query execution, markdown formatting, error handling |
-| `multi-repo.test.ts` | 16 | Multi-repo storage, filtering, recon_list_repos |
-| `community.test.ts` | 13 | Label propagation clustering, community stats, handler integration |
-| `embeddings.test.ts` | 39 | Vector store, RRF fusion, hybrid search, text generation |
-| `process.test.ts` | 21 | Execution flow detection, BFS walk, cycles, cross-language flows |
-| `http.test.ts` | 18 | HTTP REST API routes, tool execution, resources, CORS |
+| `tree-sitter.test.ts` | 58 | Multi-language extraction, cross-language consistency |
+| `query.test.ts` | 47 | Cypher parser, execution, markdown formatting |
+| `multi-repo.test.ts` | 16 | Multi-repo storage, filtering, list_repos |
+| `community.test.ts` | 13 | Label propagation clustering, handler integration |
+| `embeddings.test.ts` | 39 | Vector store, RRF fusion, hybrid search |
+| `process.test.ts` | 21 | Execution flow detection, BFS, cycles |
+| `http.test.ts` | 18 | HTTP REST API routes, CORS |
+| `framework-detection.test.ts` | 27 | Path/name framework detection, multipliers |
+| `augmentation.test.ts` | 28 | Augmentation engine, staleness check, MCP prompts |
 
-## HTTP REST API
+---
 
-As an alternative to the MCP stdio transport, Recon can serve the same tools and resources over HTTP:
+## Community Detection
 
-```bash
-npx recon serve --http              # Listen on :3100
-npx recon serve --http --port 8080  # Custom port
-```
+After indexing, Recon automatically detects code communities using the **Label Propagation Algorithm (LPA)**:
 
-### Endpoints
+- Each function/class/struct gets a `community` label based on its connections
+- Communities are named after the most common package in each cluster
+- `recon_context` shows community membership
+- `recon_impact` lists affected communities for cross-module awareness
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/health` | Health check + index stats (node/relationship counts) |
-| `GET` | `/api/tools` | List all available tools with schemas |
-| `POST` | `/api/tools/:name` | Execute a tool (body = JSON params) |
-| `GET` | `/api/resources` | List MCP resources + templates |
-| `GET` | `/api/resources/read?uri=...` | Read a resource by URI |
+---
 
-### Examples
+## Incremental Indexing
 
-```bash
-# Health check
-curl http://localhost:3100/api/health
+Files are hashed with SHA-256. On re-index, only changed files are re-analyzed:
 
-# Search for a symbol
-curl -X POST http://localhost:3100/api/tools/recon_query \
-  -H 'Content-Type: application/json' \
-  -d '{"query": "AuthMiddleware"}'
+- **TypeScript**: per-file granularity via Compiler API
+- **Tree-sitter**: per-file granularity for all 13 languages
+- **Auto-detection**: `serve` compares Git commit hashes to detect stale indexes
+- Force full re-index with `--force`
 
-# Read a resource
-curl 'http://localhost:3100/api/resources/read?uri=recon://symbol/AuthMiddleware'
-```
-
-CORS is enabled by default for browser-based clients.
-
-## AI Agent Instructions
-
-Recon includes built-in [MCP server instructions](https://modelcontextprotocol.io/docs/concepts/server-instructions) that are automatically injected into the AI agent's system prompt when the agent connects. These instructions teach agents:
-
-- **When to use Recon** vs built-in tools (grep, view_file, etc.)
-- **Critical rules** — always check blast radius before editing exported functions
-- **Workflow patterns** — safe modification, codebase exploration, rename, pre-commit review
-- **Advanced queries** — Cypher-like graph queries for structural analysis
-
-This means agents will proactively use `recon_impact` before editing shared code, use `recon_context` instead of grep for relationship queries, and use `recon_rename` for safe multi-file renames — all without any manual prompting.
-
-See [`src/mcp/instructions.ts`](src/mcp/instructions.ts) for the full instructions text.
+---
 
 ## License
 
