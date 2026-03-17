@@ -8,7 +8,7 @@ import { execSync } from 'node:child_process';
 import { rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { KnowledgeGraph } from '../graph/graph.js';
-import { analyzeGoPackages, runGoList, getModulePath, analyzeGoSymbols } from '../analyzers/go-analyzer.js';
+
 import { analyzeTypeScript } from '../analyzers/ts-analyzer.js';
 import { buildCrossLanguageEdges, extractGoRoutes } from '../analyzers/cross-language.js';
 import type { APIRoute } from '../analyzers/cross-language.js';
@@ -89,73 +89,8 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
     console.log('[recon] Previous index found ??using incremental mode.');
   }
 
-  // Run Go package analysis
-  console.log('[recon] Analyzing Go packages...');
-  const modulePath = getModulePath(projectRoot);
-  const packages = runGoList(projectRoot);
-  const goResult = analyzeGoPackages(projectRoot);
-
-  // Run Go symbol analysis (incremental)
-  console.log('[recon] Analyzing Go symbols...');
-  const symbolResult = await analyzeGoSymbols(
-    projectRoot,
-    packages,
-    modulePath,
-    previousHashes,
-  );
-
-  if (symbolResult.stats.skipped > 0) {
-    console.log(
-      `[recon] Incremental: analyzed ${symbolResult.stats.analyzed} packages, ` +
-      `skipped ${symbolResult.stats.skipped} unchanged`,
-    );
-  }
-
   // Build graph
   const graph = new KnowledgeGraph();
-
-  // Add package-level nodes and edges
-  for (const node of goResult.nodes) {
-    graph.addNode(node);
-  }
-  for (const rel of goResult.relationships) {
-    graph.addRelationship(rel);
-  }
-
-  // Add symbol-level nodes and edges
-  for (const node of symbolResult.result.nodes) {
-    graph.addNode(node);
-  }
-  for (const rel of symbolResult.result.relationships) {
-    graph.addRelationship(rel);
-  }
-
-  // If incremental, re-add symbols from unchanged packages (from previous index)
-  if (previousIndex && symbolResult.stats.skipped > 0) {
-    const analyzedPkgs = new Set(
-      symbolResult.result.nodes.map((n) => n.package),
-    );
-
-    for (const [, node] of previousIndex.graph.nodes) {
-      // Only carry over symbol nodes from packages that were skipped
-      if (node.type === 'Package' || node.type === 'File') continue;
-      if (analyzedPkgs.has(node.package)) continue;
-      if (node.language !== 'go') continue;
-      if (!graph.getNode(node.id)) {
-        graph.addNode(node);
-      }
-    }
-
-    // Carry over relationships for skipped packages
-    for (const rel of previousIndex.graph.allRelationships()) {
-      if (!graph.getRelationship(rel.id)) {
-        // Only add if both source and target exist
-        if (graph.getNode(rel.sourceId) || graph.getNode(rel.targetId)) {
-          graph.addRelationship(rel);
-        }
-      }
-    }
-  }
 
   // Run TypeScript analysis — auto-detect source location
   console.log('[recon] Analyzing TypeScript...');
@@ -255,11 +190,6 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
   const git = getGitInfo(projectRoot);
 
   // Count stats
-  const goPackages = goResult.nodes.filter((n) => n.type === 'Package').length;
-  const goSymbols = symbolResult.result.nodes.length +
-    (previousIndex && symbolResult.stats.skipped > 0
-      ? countPreviousSymbols(previousIndex.graph, symbolResult.result.nodes)
-      : 0);
   const tsFiles = tsResult.stats.files + tsResult.stats.skipped;
   const tsSymbols = tsResult.stats.components + tsResult.stats.functions;
   const elapsed = Math.round(performance.now() - startTime);
@@ -270,14 +200,14 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
     gitCommit: git.commit,
     gitBranch: git.branch,
     stats: {
-      goPackages,
-      goSymbols,
       tsModules: tsFiles,
       tsSymbols,
+      treeSitterFiles: tsitterFiles,
+      treeSitterSymbols: tsitterSymbols,
       relationships: graph.relationshipCount,
       indexTimeMs: elapsed,
     },
-    fileHashes: { ...symbolResult.fileHashes, ...tsResult.fileHashes, ...tsitterHashes },
+    fileHashes: { ...tsResult.fileHashes, ...tsitterHashes },
     apiRoutes: crossLangResult.routes.map(r => ({
       method: r.method,
       pattern: r.pattern,
@@ -349,8 +279,6 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
   }
 
   const summary = [
-    `${goPackages} Go packages`,
-    `${goSymbols} Go symbols`,
     `${tsFiles} TS files`,
     `${tsSymbols} TS symbols`,
   ];
@@ -362,24 +290,7 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
   console.log(`[recon] Saved to ${join(projectRoot, '.recon/')}`);
 }
 
-/**
- * Count symbol nodes from the previous graph that are from packages
- * NOT in the newly analyzed set.
- */
-function countPreviousSymbols(
-  prevGraph: KnowledgeGraph,
-  newNodes: import('../graph/types.js').Node[],
-): number {
-  const analyzedPkgs = new Set(newNodes.map((n) => n.package));
-  let count = 0;
-  for (const [, node] of prevGraph.nodes) {
-    if (node.type === 'Package' || node.type === 'File') continue;
-    if (node.language !== 'go') continue;
-    if (analyzedPkgs.has(node.package)) continue;
-    count++;
-  }
-  return count;
-}
+
 
 // ??? serve command ???????????????????????????????????????????????
 
@@ -456,8 +367,7 @@ export async function statusCommand(options?: { repo?: string }): Promise<void> 
   console.log(`  Indexed at:     ${meta.indexedAt}`);
   console.log(`  Git commit:     ${meta.gitCommit}${stale ? ` (HEAD is ${git.commit} ??STALE)` : ' (current)'}`);
   console.log(`  Git branch:     ${meta.gitBranch}`);
-  console.log(`  Go packages:    ${meta.stats.goPackages}`);
-  console.log(`  Go symbols:     ${meta.stats.goSymbols}`);
+  console.log(`  Tree-sitter:    ${meta.stats.treeSitterFiles || 0} files, ${meta.stats.treeSitterSymbols || 0} symbols`);
   console.log(`  TS modules:     ${meta.stats.tsModules}`);
   console.log(`  TS symbols:     ${meta.stats.tsSymbols}`);
   console.log(`  Relationships:  ${meta.stats.relationships}`);

@@ -1134,7 +1134,7 @@ async function handleListRepos(projectRoot?: string): Promise<string> {
     lines.push(`  Relationships: ${repo.relationshipCount}`);
     lines.push(`  Indexed at: ${repo.meta.indexedAt}`);
     lines.push(`  Git: ${repo.meta.gitBranch}@${repo.meta.gitCommit}`);
-    lines.push(`  Go packages: ${repo.meta.stats.goPackages}, Go symbols: ${repo.meta.stats.goSymbols}`);
+    lines.push(`  Tree-sitter: ${repo.meta.stats.treeSitterFiles || 0} files, ${repo.meta.stats.treeSitterSymbols || 0} symbols`);
     lines.push(`  TS modules: ${repo.meta.stats.tsModules}, TS symbols: ${repo.meta.stats.tsSymbols}`);
     lines.push('');
   }

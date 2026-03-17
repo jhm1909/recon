@@ -5,10 +5,10 @@
  */
 
 export interface IndexStats {
-  goPackages: number;
-  goSymbols: number;
   tsModules: number;
   tsSymbols: number;
+  treeSitterFiles?: number;
+  treeSitterSymbols?: number;
   relationships: number;
   indexTimeMs: number;
 }
