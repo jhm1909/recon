@@ -8,7 +8,6 @@ import { execSync } from 'node:child_process';
 import { rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { KnowledgeGraph } from '../graph/graph.js';
-
 import { analyzeTypeScript } from '../analyzers/ts-analyzer.js';
 import { buildCrossLanguageEdges, extractGoRoutes } from '../analyzers/cross-language.js';
 import type { APIRoute } from '../analyzers/cross-language.js';
@@ -294,9 +293,22 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
 
 // ??? serve command ???????????????????????????????????????????????
 
-export async function serveCommand(options?: { repo?: string; http?: boolean; port?: number }): Promise<void> {
+export async function serveCommand(options?: { repo?: string; http?: boolean; port?: number; noIndex?: boolean }): Promise<void> {
   const projectRoot = findProjectRoot();
   const repoName = options?.repo;
+
+  // Auto-index: check if index needs (re)building
+  if (!options?.noIndex) {
+    const existing = await loadIndex(projectRoot, repoName);
+    const git = getGitInfo(projectRoot);
+    const needsIndex = !existing || existing.meta.gitCommit !== git.commit;
+
+    if (needsIndex) {
+      const reason = !existing ? 'no index found' : 'index is stale';
+      console.error(`[recon] Auto-indexing (${reason})...`);
+      await indexCommand({ force: !existing, repo: repoName });
+    }
+  }
 
   let graph: KnowledgeGraph;
   let vectorStore: VectorStore | null = null;
