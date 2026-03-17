@@ -24,6 +24,29 @@ import { getAvailableLanguages } from '../analyzers/tree-sitter/index.js';
 import { detectCommunities } from '../graph/community.js';
 
 /**
+ * Auto-detect where TypeScript source files live.
+ * Probes: apps/web/src → src/ → root (tsconfig.json present)
+ */
+function detectWebAppPath(projectRoot: string): string {
+  // Monorepo: apps/web/src/
+  if (existsSync(join(projectRoot, 'apps', 'web', 'src'))) {
+    return 'apps/web';
+  }
+  // Standard: ./src/ with tsconfig at root
+  if (existsSync(join(projectRoot, 'src')) && existsSync(join(projectRoot, 'tsconfig.json'))) {
+    return '.';
+  }
+  // Other common mono patterns
+  for (const candidate of ['packages/app', 'packages/web', 'app']) {
+    if (existsSync(join(projectRoot, candidate, 'src'))) {
+      return candidate;
+    }
+  }
+  // Fallback
+  return '.';
+}
+
+/**
  * Find project root by walking up to find go.mod.
  */
 function findProjectRoot(from: string = process.cwd()): string {
@@ -134,9 +157,10 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
     }
   }
 
-  // Run TypeScript analysis
+  // Run TypeScript analysis — auto-detect source location
   console.log('[recon] Analyzing TypeScript...');
-  const tsResult = await analyzeTypeScript(projectRoot, 'apps/web', previousHashes);
+  const webAppRelPath = detectWebAppPath(projectRoot);
+  const tsResult = await analyzeTypeScript(projectRoot, webAppRelPath, previousHashes);
 
   if (tsResult.stats.skipped > 0) {
     console.log(
@@ -404,7 +428,7 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
     const port = options.port || 3100;
     await startHttpServer({ port, graph, projectRoot, vectorStore });
     // Keep process alive
-    await new Promise(() => {});
+    await new Promise(() => { });
   } else {
     console.error('[recon] MCP server starting on stdio...');
     await startServer(graph, projectRoot, vectorStore);

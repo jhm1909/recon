@@ -64,6 +64,10 @@ function discoverTSFiles(srcRoot: string): string[] {
         entry.name === 'node_modules' ||
         entry.name === '.next' ||
         entry.name === '__tests__' ||
+        entry.name === 'dist' ||
+        entry.name === 'test' ||
+        entry.name === '.reference' ||
+        entry.name === '.recon' ||
         entry.name === 'messages' // i18n JSON files
       ) continue;
 
@@ -555,8 +559,11 @@ function buildGraph(
  * e.g., "apps/web/src/components/ui/button.tsx" → "components/ui"
  */
 function getPackage(fileRelPath: string, webAppRelPath: string): string {
-  const srcPrefix = `${webAppRelPath}/src/`;
-  if (!fileRelPath.startsWith(srcPrefix)) return webAppRelPath;
+  // Normalize: when webAppRelPath is '.', srcPrefix should be 'src/'
+  const srcPrefix = webAppRelPath === '.'
+    ? 'src/'
+    : `${webAppRelPath}/src/`;
+  if (!fileRelPath.startsWith(srcPrefix)) return webAppRelPath === '.' ? 'root' : webAppRelPath;
 
   const afterSrc = fileRelPath.slice(srcPrefix.length);
   const parts = afterSrc.split('/');
