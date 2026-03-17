@@ -18,6 +18,7 @@ import type { VectorStore } from '../search/vector-store.js';
 import { RECON_TOOLS } from './tools.js';
 import { handleToolCall } from './handlers.js';
 import { getNextStepHint } from './hints.js';
+import { RECON_INSTRUCTIONS } from './instructions.js';
 import {
   getResourceDefinitions,
   getResourceTemplates,
@@ -36,7 +37,10 @@ export function createServer(
 ): Server {
   const server = new Server(
     { name: 'recon', version: VERSION },
-    { capabilities: { tools: {}, resources: {}, prompts: {} } },
+    {
+      capabilities: { tools: {}, resources: {}, prompts: {} },
+      instructions: RECON_INSTRUCTIONS,
+    },
   );
 
   // ─── ListResources ────────────────────────────────────────────
