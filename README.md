@@ -29,7 +29,7 @@ AI coding agents are blind to architecture. They grep, they guess, they break th
 
 | Language | Analyzer | What's indexed |
 |----------|----------|---------------|
-| **Go** | Dedicated (AST CLI) | Packages, functions, methods, structs, interfaces, call graph, imports |
+| **Go** | Tree-sitter + dedicated | Packages, functions, methods, structs, interfaces, call graph, imports |
 | **TypeScript** | Dedicated (Compiler API) | Modules, components, functions, types, JSX usage, imports |
 | **Python** | Tree-sitter | Classes, functions, methods, inheritance, imports, calls |
 | **Rust** | Tree-sitter | Structs, enums, traits, functions, impl blocks, use imports, calls |
@@ -51,7 +51,6 @@ Kotlin and Swift grammars are optional dependencies — install them with `npm i
 ├── bin/recon                # CLI entry point
 ├── src/
 │   ├── analyzers/
-│   │   ├── go-analyzer.ts   # Go packages + AST symbol extraction
 │   │   ├── ts-analyzer.ts   # TypeScript/React component extraction
 │   │   ├── cross-language.ts # Go route ↔ TS API call matching
 │   │   ├── tree-sitter/     # Multi-language tree-sitter analyzer
@@ -71,6 +70,7 @@ Kotlin and Swift grammars are optional dependencies — install them with `npm i
 │   │   ├── tools.ts         # Tool definitions (JSON Schema)
 │   │   ├── handlers.ts      # Tool dispatch + query logic
 │   │   ├── hints.ts         # Next-step hints appended to responses
+│   │   ├── instructions.ts  # AI agent instructions (injected into system prompt)
 │   │   ├── rename.ts        # Graph-aware multi-file rename
 │   │   └── resources.ts     # MCP Resources (recon:// URIs)
 │   ├── query/
@@ -94,34 +94,55 @@ Kotlin and Swift grammars are optional dependencies — install them with `npm i
 │   └── cli/
 │       ├── index.ts         # Commander CLI setup
 │       └── commands.ts      # index, serve, status, clean commands
-└── analyzer/                # Go AST CLI (built automatically)
-    └── main.go
 ```
 
 ### Data Flow
 
 ```
-  go list → Go packages      ─┐
-  Go AST CLI → symbols/calls  ├─→ KnowledgeGraph ─→ .recon/graph.json
-  TS Compiler API → components ├─→   (in-memory)  ─→ .recon/meta.json
-  tree-sitter → 13 languages  ├─→   + BM25 Index  ─→ .recon/search.json
-  router.go → API routes      ─┤   + Communities  ─→ .recon/embeddings.json
-  label propagation → clusters ─┤   + Embeddings
-  BFS → execution flows       ─┘   + Processes
-                                         │
-                               ┌─────────┴──────────┐
-                          MCP Server (stdio)   HTTP REST API
-                          ┌────┴────┐          (:3100)
-                       10 Tools   5 Resources
-                          │         │
-                    ┌─────┼─────┐   recon://packages
-                    │     │     │   recon://symbol/{name}
-               Claude   Cursor  …   recon://file/{path}
-                Code            …   recon://process/{name}
-                                    recon://stats
+  TS Compiler API → components ─┐
+  tree-sitter → 13 languages   ├─→ KnowledgeGraph ─→ .recon/graph.json
+  router.go → API routes       ─┤   (in-memory)   ─→ .recon/meta.json
+  label propagation → clusters ─┤   + BM25 Index   ─→ .recon/search.json
+  BFS → execution flows        ─┘   + Communities  ─→ .recon/embeddings.json
+                                     + Embeddings
+                                     + Processes
+                                          │
+                                ┌─────────┴──────────┐
+                           MCP Server (stdio)   HTTP REST API
+                           ┌────┴────┐          (:3100)
+                        10 Tools   5 Resources
+                           │         │
+                     ┌─────┼─────┐   recon://packages
+                     │     │     │   recon://symbol/{name}
+                 Claude   Cursor  …   recon://file/{path}
+                  Code   Antigravity  recon://process/{name}
+                                      recon://stats
 ```
 
 ## Installation
+
+### Quick Start (npx — no install needed)
+
+```bash
+# Index your project
+cd /path/to/your/project
+npx recon-mcp index
+
+# Start MCP server (auto-indexes if needed)
+npx recon-mcp serve
+```
+
+### Global Install
+
+```bash
+npm install -g recon-mcp
+
+# Then use anywhere
+recon index
+recon serve
+```
+
+### From Source
 
 ```bash
 git clone https://github.com/jhm1909/recon.git
@@ -130,7 +151,7 @@ npm install
 npm run build
 ```
 
-Requires Node.js >= 20 and Go (for AST analysis). The Go AST analyzer binary is built automatically on first index. Tree-sitter grammars for Python, Rust, Java, C, C++, Ruby, PHP, and C# are installed as npm dependencies. Kotlin and Swift grammars are optional.
+Requires Node.js >= 20. Tree-sitter grammars for all supported languages are installed as npm dependencies. Kotlin and Swift grammars are optional (`npm install tree-sitter-kotlin tree-sitter-swift`).
 
 ## Usage
 
@@ -155,38 +176,77 @@ npx recon status
 # Show status for a specific repo
 npx recon status --repo my-backend
 
-# Start MCP server on stdio (loads all indexed repos)
-npx recon serve
+# Start MCP server on stdio (auto-indexes if needed)
+npx recon-mcp serve
+
+# Start without auto-indexing (use existing index)
+npx recon-mcp serve --no-index
 
 # Start MCP server for a specific repo only
-npx recon serve --repo my-backend
+npx recon-mcp serve --repo my-backend
 
 # Start HTTP REST API server instead of MCP
-npx recon serve --http
+npx recon-mcp serve --http
 
 # Start HTTP REST API on a custom port (default: 3100)
-npx recon serve --http --port 8080
+npx recon-mcp serve --http --port 8080
 
 # Delete index
-npx recon clean
+npx recon-mcp clean
 
 # Delete index for a specific repo only
-npx recon clean --repo my-backend
+npx recon-mcp clean --repo my-backend
 ```
+
+> **Auto-index:** `serve` automatically checks if the index exists and is up-to-date with the current Git commit. If not, it runs `index` automatically before starting. Use `--no-index` to skip this check.
 
 ### MCP Integration
 
-Add to your MCP client config (e.g., `.claude/mcp.json`):
+Add to your AI agent's MCP config to give it code intelligence:
+
+**Claude Code** (`.claude/mcp.json`):
 
 ```json
 {
   "mcpServers": {
     "recon": {
-      "command": "node",
-      "args": ["/path/to/recon/dist/cli/index.js", "serve"]
+      "command": "npx",
+      "args": ["recon-mcp", "serve"],
+      "cwd": "/path/to/your/project"
     }
   }
 }
+```
+
+**Cursor** (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "recon": {
+      "command": "npx",
+      "args": ["recon-mcp", "serve"],
+      "cwd": "/path/to/your/project"
+    }
+  }
+}
+```
+
+**Antigravity** (`mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "recon": {
+      "command": "npx",
+      "args": ["recon-mcp", "serve"],
+      "cwd": "/path/to/your/project"
+    }
+  }
+}
+```
+
+> **Server Instructions:** Recon includes built-in MCP instructions that are automatically injected into the AI agent's system prompt. The agent will know when to use `recon_impact` before editing, `recon_context` for exploration, etc. — no manual configuration needed.
 ```
 
 ## Multi-Repo Support
@@ -413,10 +473,10 @@ Install `@huggingface/transformers` (listed as optional dependency) for semantic
 
 Files are hashed with SHA-256. On re-index, only changed files are re-analyzed:
 
-- **Go**: per-package granularity — if any `.go` file in a package changed, re-analyze the whole package
 - **TypeScript**: per-file granularity — only re-parse changed `.ts`/`.tsx` files
 - **Tree-sitter languages**: per-file granularity — only re-parse changed source files
 - Unchanged symbols are carried over from the previous index
+- `serve` auto-detects stale indexes by comparing Git commit hashes
 
 Force full re-index with `--force` if the graph seems stale.
 
@@ -528,6 +588,19 @@ curl 'http://localhost:3100/api/resources/read?uri=recon://symbol/AuthMiddleware
 ```
 
 CORS is enabled by default for browser-based clients.
+
+## AI Agent Instructions
+
+Recon includes built-in [MCP server instructions](https://modelcontextprotocol.io/docs/concepts/server-instructions) that are automatically injected into the AI agent's system prompt when the agent connects. These instructions teach agents:
+
+- **When to use Recon** vs built-in tools (grep, view_file, etc.)
+- **Critical rules** — always check blast radius before editing exported functions
+- **Workflow patterns** — safe modification, codebase exploration, rename, pre-commit review
+- **Advanced queries** — Cypher-like graph queries for structural analysis
+
+This means agents will proactively use `recon_impact` before editing shared code, use `recon_context` instead of grep for relationship queries, and use `recon_rename` for safe multi-file renames — all without any manual prompting.
+
+See [`src/mcp/instructions.ts`](src/mcp/instructions.ts) for the full instructions text.
 
 ## License
 
