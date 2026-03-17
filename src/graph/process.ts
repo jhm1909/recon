@@ -15,6 +15,7 @@
 import type { KnowledgeGraph } from './graph.js';
 import { NodeType, RelationshipType } from './types.js';
 import type { Node } from './types.js';
+import { getEntryPointMultiplier } from '../analyzers/framework-detection.js';
 
 // ─── Config ─────────────────────────────────────────────────────
 
@@ -191,7 +192,11 @@ function scoreEntryPoints(
     // Root bonus: no callers at all → strong entry point
     const rootBonus = callers.length === 0 ? 1.5 : 1.0;
 
-    const score = baseScore * exportMult * nameMult * penaltyMult * rootBonus;
+    // Framework detection multiplier
+    const framework = getEntryPointMultiplier(node.file, node.name);
+    const frameworkMult = framework.multiplier;
+
+    const score = baseScore * exportMult * nameMult * penaltyMult * rootBonus * frameworkMult;
 
     if (score > 0.1) { // Minimum threshold
       candidates.push({ node, score });

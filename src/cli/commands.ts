@@ -355,6 +355,18 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
     console.error(`[recon] Loaded ${vectorStore.size} embeddings (${vectorStore.dimensions}d)`);
   }
 
+  // Staleness check
+  try {
+    const { checkStaleness } = await import('../mcp/staleness.js');
+    const stored = await loadIndex(projectRoot, repoName);
+    if (stored?.meta?.gitCommit) {
+      const staleness = checkStaleness(projectRoot, stored.meta.gitCommit);
+      if (staleness.isStale) {
+        console.error(`[recon] ${staleness.hint}`);
+      }
+    }
+  } catch { /* ignore staleness errors */ }
+
   if (options?.http) {
     const { startHttpServer } = await import('../server/http.js');
     const port = options.port || 3100;

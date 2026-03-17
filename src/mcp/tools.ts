@@ -337,4 +337,22 @@ AFTER THIS: Use READ recon://process/{name} for a detailed step-by-step trace of
       required: [],
     },
   },
+  {
+    name: 'recon_augment',
+    description: `Quick context injection for a symbol. Returns callers, callees, process participation, community, and blast radius warning in a compact format.
+
+WHEN TO USE: When you want rapid graph context for a symbol without the full recon_context output. Useful for hook integration and quick lookups.
+AFTER THIS: Use recon_context() for full detail, or recon_impact() for blast radius analysis.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pattern: {
+          type: 'string',
+          description: 'Symbol name to look up (e.g., "buildGraph", "handleLogin")',
+        },
+        repo: REPO_PROPERTY,
+      },
+      required: ['pattern'],
+    },
+  },
 ];

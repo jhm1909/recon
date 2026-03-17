@@ -18,6 +18,7 @@ import type { RenameResult } from './rename.js';
 import { executeQuery as executeCypherQuery, formatResultAsMarkdown } from '../query/index.js';
 import { listRepos } from '../storage/store.js';
 import { detectProcesses, type Process } from '../graph/process.js';
+import { augment } from './augmentation.js';
 
 /**
  * Filter a graph to only include nodes belonging to a specific repo.
@@ -95,6 +96,9 @@ export async function handleToolCall(
 
     case 'recon_processes':
       return handleProcesses(args, graph);
+
+    case 'recon_augment':
+      return handleAugment(args, graph);
 
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -1252,4 +1256,23 @@ function handleProcesses(
   }
 
   return lines.join('\n');
+}
+
+// ─── recon_augment ──────────────────────────────────────────────
+
+function handleAugment(
+  args: Record<string, unknown> | undefined,
+  graph: KnowledgeGraph,
+): string {
+  const pattern = args?.pattern as string;
+  if (!pattern) throw new Error("'pattern' is required.");
+
+  graph = maybeFilterByRepo(args, graph);
+
+  const result = augment(pattern, graph);
+  if (!result) {
+    return `No graph context found for "${pattern}". Try recon_query({query: "${pattern}"}) for text search.`;
+  }
+
+  return result;
 }
