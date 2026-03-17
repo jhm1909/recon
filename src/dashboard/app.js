@@ -528,18 +528,22 @@ async function loadProcesses() {
     for (let i = 0; i < processes.length; i++) {
       const p = processes[i];
       const delay = Math.min(i * 50, 500);
+      const shownSteps = p.steps.slice(0, 8);
+      const moreSteps = p.steps.length > 8 ? `<span class="step-arrow">... +${p.steps.length - 8}</span>` : '';
       html += `<div class="process-card" style="animation-delay:${delay}ms">
         <div class="process-header">
           <div class="process-label">${esc(p.label)}</div>
           <div class="process-tags">
             ${p.isCross ? '<span class="process-tag tag-cross">🔀 Cross</span>' : '<span class="process-tag tag-intra">📦 Intra</span>'}
-            <span class="process-tag tag-complexity">⚡ ${p.steps.length} steps</span>
+            <span class="process-tag tag-complexity">⚡ ${p.branches || p.steps.length} branches</span>
           </div>
         </div>
+        ${p.entry ? `<div class="process-stats"><span>📄 <strong>${esc(p.entry)}</strong></span></div>` : ''}
         <div class="process-steps">
-          ${p.steps.map((s, idx) => `<span class="step-node">${esc(s)}</span>${idx < p.steps.length - 1 ? '<span class="step-arrow">→</span>' : ''}`).join('')}
+          ${shownSteps.map((s, idx) => `<span class="step-node">${esc(s)}</span>${idx < shownSteps.length - 1 ? '<span class="step-arrow">→</span>' : ''}`).join('')}
+          ${moreSteps}
         </div>
-        ${p.community ? `<div class="process-community">📦 ${esc(p.community)}</div>` : ''}
+        ${p.community ? `<div class="process-community">🏘️ ${esc(p.community)}</div>` : ''}
       </div>`;
     }
 
@@ -553,32 +557,66 @@ function parseProcesses(raw) {
   const processes = [];
   const lines = raw.split('\n');
   let current = null;
+  let inCodeBlock = false;
 
   for (const line of lines) {
-    // Process header: "1. 📦 label (N steps, complexity X) [community]" or "1. 🔀 label ..."
-    const headerMatch = line.match(/^\d+\.\s*(📦|🔀)\s*(.+?)\s*\((\d+)\s*steps?/);
+    // Process header: "## 1. main (17 branches)"
+    const headerMatch = line.match(/^##\s*\d+\.\s*(.+?)\s*\((\d+)\s*branch/);
     if (headerMatch) {
       if (current) processes.push(current);
       current = {
-        isCross: headerMatch[1] === '🔀',
-        label: headerMatch[2].trim(),
+        isCross: false,
+        label: headerMatch[1].trim(),
+        branches: parseInt(headerMatch[2], 10),
         steps: [],
         community: '',
+        entry: '',
+        depth: 0,
+        complexity: 0,
       };
-      // Extract community
-      const commMatch = line.match(/\[(.*?)\]/);
-      if (commMatch) current.community = commMatch[1];
       continue;
     }
 
-    // Step line: "   ① name → ② name → ..."  or just indented text with arrows
-    if (current && line.trim().startsWith('`')) {
-      // Code block trace
-      const stepNames = line.replace(/`/g, '').split('→').map(s => s.replace(/^[①②③④⑤⑥⑦⑧⑨⑩\d.)\s]+/, '').trim()).filter(Boolean);
-      if (stepNames.length > 0) current.steps = stepNames;
-    } else if (current && line.includes('→') && !line.startsWith('#')) {
-      const stepNames = line.split('→').map(s => s.replace(/^[\s①②③④⑤⑥⑦⑧⑨⑩\d.)\s`]+/, '').replace(/[`\s]+$/, '').trim()).filter(Boolean);
-      if (stepNames.length > 1) current.steps = stepNames;
+    if (!current) continue;
+
+    // Metadata line: "🔀 cross-community | Entry: `src/...` (typescript)"
+    if (line.includes('cross-community')) {
+      current.isCross = true;
+      const entryMatch = line.match(/Entry:\s*`([^`]+)`/);
+      if (entryMatch) current.entry = entryMatch[1];
+    }
+
+    // Communities line
+    const commMatch = line.match(/^Communities:\s*(.+)/);
+    if (commMatch) current.community = commMatch[1].trim();
+
+    // Code block boundaries
+    if (line.trim() === '```') {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+
+    // Inside code block: parse call tree
+    // Lines like "  → loadGraph (src/scripts/pr-review.ts:112)"
+    // or root line like "main"
+    if (inCodeBlock && current) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // Extract function name (strip → prefix, strip file path suffix)
+      let name = trimmed;
+      name = name.replace(/^→\s*/, '');
+      name = name.replace(/\s*\(src\/.*$/, '');
+      name = name.trim();
+
+      if (name) current.steps.push(name);
+    }
+
+    // Also match table rows for summary info: "| 1 | **main (17 branches)** | 🔀 | 17 | 4 | 39.8 |"
+    const tableMatch = line.match(/\|\s*\d+\s*\|\s*\*\*(.+?)\*\*\s*\|\s*(📦|🔀)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*([\d.]+)\s*\|/);
+    if (tableMatch && current && current.label.includes(tableMatch[1].split(' ')[0])) {
+      current.depth = parseInt(tableMatch[4], 10);
+      current.complexity = parseFloat(tableMatch[5]);
     }
   }
   if (current) processes.push(current);
