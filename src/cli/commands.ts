@@ -12,6 +12,7 @@ import { analyzeTypeScript } from '../analyzers/ts-analyzer.js';
 import { buildCrossLanguageEdges, extractGoRoutes } from '../analyzers/cross-language.js';
 import type { APIRoute } from '../analyzers/cross-language.js';
 import { saveIndex, saveSearchIndex, saveEmbeddings, loadIndex, loadEmbeddings, listRepos, loadAllRepos, defaultRepoName } from '../storage/store.js';
+import { generateAgentsMd } from '../generators/agents-gen.js';
 import type { IndexMeta } from '../storage/types.js';
 import { startServer } from '../mcp/server.js';
 import { BM25Index } from '../search/bm25.js';
@@ -233,6 +234,14 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
   }
 
   await saveIndex(projectRoot, graph, meta, repoName);
+
+  // Generate AGENTS.md
+  const agentsMd = generateAgentsMd(graph, repoName);
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const reconDir = join(projectRoot, '.recon');
+  mkdirSync(reconDir, { recursive: true });
+  writeFileSync(join(reconDir, 'AGENTS.md'), agentsMd);
+  console.log(`[recon] Generated .recon/AGENTS.md`);
 
   // Build and save BM25 search index
   console.log('[recon] Building search index...');
