@@ -276,7 +276,7 @@ describe('recon_impact handler', () => {
       direction: 'upstream',
     }, graph);
     // 2 direct callers but cross-app (apps/api + apps/web) → CRITICAL
-    expect(result).toContain('**Risk:** CRITICAL');
+    expect(result).toContain('CRITICAL');
   });
 
   it('respects maxDepth', async () => {

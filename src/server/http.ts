@@ -142,7 +142,8 @@ export function createApp(options: HttpServerOptions): express.Express {
     const pkgFilter = req.query.package as string | undefined;
 
     // Structural edge types to skip (clutter the visualization)
-    const SKIP_EDGE_TYPES = new Set(['CONTAINS', 'DEFINES']);
+    // Note: DEFINES is kept because for TS-only projects it may be the only edge type
+    const SKIP_EDGE_TYPES = new Set(['CONTAINS']);
 
     // Compute degree for each node (non-structural edges only)
     const degrees = new Map<string, number>();

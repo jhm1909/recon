@@ -17,7 +17,7 @@ import { planRename, formatRenameResult } from './rename.js';
 import type { RenameResult } from './rename.js';
 import { executeQuery as executeCypherQuery, formatResultAsMarkdown } from '../query/index.js';
 import { listRepos } from '../storage/store.js';
-import { detectProcesses } from '../graph/process.js';
+import { detectProcesses, type Process } from '../graph/process.js';
 
 /**
  * Filter a graph to only include nodes belonging to a specific repo.
@@ -287,19 +287,28 @@ function handleImpact(
   }
 
   // Risk calculation
+  // Risk calculation — weighted by confidence
   const d1Count = byDepth.find(d => d.depth === 1)?.symbols.length || 0;
   const allSymbols = byDepth.flatMap(d => d.symbols);
-  const apps = new Set(allSymbols.map(s => s.file.split('/')[0]).filter(a => a === 'apps'));
   const crossApp = new Set(allSymbols
     .map(s => s.file.match(/^apps\/([^/]+)/)?.[1])
     .filter(Boolean)
   ).size > 1;
 
+  // Confidence breakdown
+  const highConf = allSymbols.filter(s => s.confidence >= 0.9);
+  const medConf = allSymbols.filter(s => s.confidence >= 0.7 && s.confidence < 0.9);
+  const lowConf = allSymbols.filter(s => s.confidence < 0.7);
+
+  // Risk = weighted by confidence (high-confidence direct deps are riskier)
+  const d1HighConf = byDepth.find(d => d.depth === 1)?.symbols
+    .filter(s => s.confidence >= 0.9).length || 0;
+
   let risk: string;
-  if (d1Count >= 20 || crossApp) risk = 'CRITICAL';
-  else if (d1Count >= 10) risk = 'HIGH';
-  else if (d1Count >= 3) risk = 'MEDIUM';
-  else risk = 'LOW';
+  if (d1HighConf >= 20 || crossApp) risk = '🔴 CRITICAL';
+  else if (d1HighConf >= 10 || d1Count >= 20) risk = '🟠 HIGH';
+  else if (d1Count >= 3) risk = '🟡 MEDIUM';
+  else risk = '🟢 LOW';
 
   const totalAffected = allSymbols.length;
 
@@ -314,6 +323,12 @@ function handleImpact(
     }
   }
 
+  // Confidence tier label
+  const confLabel = (c: number) =>
+    c >= 0.9 ? '🔴' : c >= 0.7 ? '🟡' : '🟢';
+  const confTier = (c: number) =>
+    c >= 0.9 ? 'CERTAIN' : c >= 0.7 ? 'LIKELY' : 'POSSIBLE';
+
   // Format
   const lines: string[] = [
     `# Impact Analysis: ${targetNode.name}`,
@@ -322,6 +337,7 @@ function handleImpact(
     `**Direction:** ${direction}`,
     `**Risk:** ${risk}`,
     `**Summary:** ${d1Count} direct ${direction === 'upstream' ? 'callers' : 'callees'}, ${totalAffected} total affected`,
+    `**Confidence:** 🔴 ${highConf.length} certain, 🟡 ${medConf.length} likely, 🟢 ${lowConf.length} possible`,
     ...(affectedCommunities.size > 0
       ? [`**Affected communities:** ${Array.from(affectedCommunities).join(', ')} (${affectedCommunities.size})`]
       : []),
@@ -332,8 +348,10 @@ function handleImpact(
     lines.push(`## d=${group.depth}: ${group.label} (${group.symbols.length})`);
     lines.push('');
 
-    for (const sym of group.symbols) {
-      lines.push(`- **${sym.name}** (${sym.type}) ??\`${sym.file}:${sym.line}\` [${sym.edgeType}, ${sym.confidence}]`);
+    // Sort by confidence descending within each depth group
+    const sorted = [...group.symbols].sort((a, b) => b.confidence - a.confidence);
+    for (const sym of sorted) {
+      lines.push(`- ${confLabel(sym.confidence)} **${sym.name}** (${sym.type}) →\`${sym.file}:${sym.line}\` [${sym.edgeType}, ${confTier(sym.confidence)} ${Math.round(sym.confidence * 100)}%]`);
     }
     lines.push('');
   }
@@ -434,6 +452,35 @@ function handleContext(
     }
     lines.push('');
   }
+
+  // Process participation — show which execution flows this symbol is in
+  const allProcesses = detectProcesses(graph, { limit: 50 });
+  const participating: Array<{ processName: string; stepIndex: number; totalSteps: number }> = [];
+  for (const proc of allProcesses) {
+    // Check if entry point matches
+    if (proc.entryPoint.name === node.name && proc.entryPoint.file === node.file) {
+      participating.push({ processName: proc.name, stepIndex: 0, totalSteps: proc.steps.length });
+      continue;
+    }
+    // Check steps
+    for (let i = 0; i < proc.steps.length; i++) {
+      if (proc.steps[i].name === node.name && proc.steps[i].file === node.file) {
+        participating.push({ processName: proc.name, stepIndex: i + 1, totalSteps: proc.steps.length });
+        break;
+      }
+    }
+  }
+
+  lines.push(`### Execution Flows (${participating.length})`);
+  if (participating.length === 0) {
+    lines.push('_none_');
+  } else {
+    for (const p of participating) {
+      const role = p.stepIndex === 0 ? 'entry point' : `step ${p.stepIndex}/${p.totalSteps}`;
+      lines.push(`- **${p.processName}** (${role})`);
+    }
+  }
+  lines.push('');
 
   return lines.join('\n');
 }
@@ -1163,21 +1210,45 @@ function handleProcesses(
     ].join('\n');
   }
 
+  const crossCount = processes.filter(p => p.processType === 'cross_community').length;
+
   const lines: string[] = [
     '# Execution Flows',
     '',
-    `**Detected:** ${processes.length} flow(s)`,
+    `**Detected:** ${processes.length} flow(s)${crossCount > 0 ? ` (${crossCount} cross-community)` : ''}`,
     ...(filter ? [`**Filter:** "${filter}"`] : []),
     '',
-    '| # | Process | Entry Point | File | Steps | Depth | Complexity |',
-    '|---|---------|-------------|------|-------|-------|------------|',
+    '| # | Flow | Type | Steps | Depth | Complexity |',
+    '|---|------|------|-------|-------|------------|',
   ];
 
   for (let i = 0; i < processes.length; i++) {
     const p = processes[i];
+    const tag = p.processType === 'cross_community' ? '🔀' : '📦';
     lines.push(
-      `| ${i + 1} | **${p.name}** | ${p.entryPoint.type} | \`${p.entryPoint.file}:${p.entryPoint.line}\` | ${p.steps.length} | ${p.depth} | ${p.complexity} |`,
+      `| ${i + 1} | **${p.label}** | ${tag} | ${p.steps.length} | ${p.depth} | ${p.complexity} |`,
     );
+  }
+
+  // Step traces for top flows (max 5)
+  lines.push('');
+  for (let i = 0; i < Math.min(processes.length, 5); i++) {
+    const p = processes[i];
+    const tag = p.processType === 'cross_community' ? '🔀 cross-community' : '📦 intra-community';
+    lines.push(`## ${i + 1}. ${p.label}`);
+    lines.push(`${tag} | Entry: \`${p.entryPoint.file}:${p.entryPoint.line}\` (${p.entryPoint.language})`);
+    if (p.communities.length > 0) {
+      lines.push(`Communities: ${p.communities.join(', ')}`);
+    }
+    lines.push('');
+    lines.push('```');
+    lines.push(`${p.entryPoint.name}`);
+    for (const step of p.steps) {
+      const indent = '  '.repeat(step.depth);
+      lines.push(`${indent}→ ${step.name} (${step.file}:${step.line})`);
+    }
+    lines.push('```');
+    lines.push('');
   }
 
   return lines.join('\n');

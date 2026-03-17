@@ -25,6 +25,8 @@ interface FileSymbol {
   isExported: boolean;
   startLine: number;
   endLine: number;
+  extends?: string[];      // class/interface extends
+  implements?: string[];   // class implements
 }
 
 interface FileImport {
@@ -39,11 +41,17 @@ interface FileReExport {
   from: string;
 }
 
+interface FileCall {
+  calleeName: string;
+  line: number;
+}
+
 interface FileAnalysis {
   symbols: FileSymbol[];
   imports: FileImport[];
   reExports: FileReExport[];
   jsxComponents: Set<string>;
+  calls: FileCall[];
 }
 
 // ─── File Discovery ──────────────────────────────────────────
@@ -268,6 +276,20 @@ function analyzeSourceFile(sf: ts.SourceFile): FileAnalysis {
 
     // ─── Interface declarations ───────────────
     if (ts.isInterfaceDeclaration(stmt)) {
+      // Extract extends clause
+      const extendsNames: string[] = [];
+      if (stmt.heritageClauses) {
+        for (const clause of stmt.heritageClauses) {
+          if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
+            for (const type of clause.types) {
+              if (ts.isIdentifier(type.expression)) {
+                extendsNames.push(type.expression.text);
+              }
+            }
+          }
+        }
+      }
+
       symbols.push({
         name: stmt.name.text,
         kind: 'interface',
@@ -275,6 +297,7 @@ function analyzeSourceFile(sf: ts.SourceFile): FileAnalysis {
         isExported: hasModifier(stmt, ts.SyntaxKind.ExportKeyword),
         startLine: sf.getLineAndCharacterOfPosition(stmt.getStart()).line + 1,
         endLine: sf.getLineAndCharacterOfPosition(stmt.getEnd()).line + 1,
+        ...(extendsNames.length > 0 ? { extends: extendsNames } : {}),
       });
     }
 
@@ -295,8 +318,24 @@ function analyzeSourceFile(sf: ts.SourceFile): FileAnalysis {
       const name = stmt.name.text;
       const hasExport = hasModifier(stmt, ts.SyntaxKind.ExportKeyword);
       const hasDefault = hasModifier(stmt, ts.SyntaxKind.DefaultKeyword);
-      // PascalCase classes in .tsx are likely components (e.g., ErrorBoundary)
       const kind: 'component' | 'function' = isPascalCase(name) ? 'component' : 'function';
+
+      // Extract heritage clauses
+      const extendsNames: string[] = [];
+      const implementsNames: string[] = [];
+      if (stmt.heritageClauses) {
+        for (const clause of stmt.heritageClauses) {
+          for (const type of clause.types) {
+            if (!ts.isIdentifier(type.expression)) continue;
+            const typeName = type.expression.text;
+            if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
+              extendsNames.push(typeName);
+            } else if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
+              implementsNames.push(typeName);
+            }
+          }
+        }
+      }
 
       symbols.push({
         name,
@@ -305,12 +344,18 @@ function analyzeSourceFile(sf: ts.SourceFile): FileAnalysis {
         isExported: hasExport || hasDefault,
         startLine: sf.getLineAndCharacterOfPosition(stmt.getStart()).line + 1,
         endLine: sf.getLineAndCharacterOfPosition(stmt.getEnd()).line + 1,
+        ...(extendsNames.length > 0 ? { extends: extendsNames } : {}),
+        ...(implementsNames.length > 0 ? { implements: implementsNames } : {}),
       });
     }
   }
 
   // Walk entire tree for JSX component usages
   walkJsx(sf, jsxComponents);
+
+  // Walk entire tree for function call expressions
+  const calls: FileCall[] = [];
+  walkCalls(sf, calls);
 
   // Post-pass: apply `export { X }` to mark symbols as exported
   if (localExportNames.size > 0) {
@@ -321,7 +366,7 @@ function analyzeSourceFile(sf: ts.SourceFile): FileAnalysis {
     }
   }
 
-  return { symbols, imports, reExports, jsxComponents };
+  return { symbols, imports, reExports, jsxComponents, calls };
 }
 
 // ─── AST Helpers ─────────────────────────────────────────────
@@ -361,6 +406,55 @@ function walkJsx(node: ts.Node, components: Set<string>): void {
     }
   }
   ts.forEachChild(node, (child) => walkJsx(child, components));
+}
+
+// ─── Call Expression Extraction ─────────────────────────────────
+
+/** Built-in / noise function names to skip */
+const SKIP_CALL_NAMES = new Set([
+  'require', 'import', 'console', 'log', 'warn', 'error', 'info', 'debug',
+  'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
+  'Promise', 'resolve', 'reject', 'then', 'catch', 'finally',
+  'JSON', 'parse', 'stringify', 'toString', 'valueOf',
+  'Array', 'Object', 'Map', 'Set', 'String', 'Number', 'Boolean',
+  'push', 'pop', 'shift', 'unshift', 'splice', 'slice', 'concat',
+  'filter', 'map', 'reduce', 'forEach', 'find', 'findIndex', 'some', 'every',
+  'includes', 'indexOf', 'join', 'split', 'replace', 'trim', 'match', 'test',
+  'keys', 'values', 'entries', 'has', 'get', 'set', 'delete', 'add', 'clear',
+  'from', 'of', 'isArray', 'assign', 'freeze', 'defineProperty',
+  'addEventListener', 'removeEventListener', 'querySelector', 'getElementById',
+  'createElement', 'appendChild', 'emit', 'on', 'off', 'once',
+  'describe', 'it', 'test', 'expect', 'beforeEach', 'afterEach', 'beforeAll', 'afterAll',
+]);
+
+function walkCalls(node: ts.Node, calls: FileCall[]): void {
+  if (ts.isCallExpression(node)) {
+    const name = extractCallName(node.expression);
+    if (name && !SKIP_CALL_NAMES.has(name)) {
+      const sf = node.getSourceFile();
+      calls.push({
+        calleeName: name,
+        line: sf.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+      });
+    }
+  }
+  ts.forEachChild(node, (child) => walkCalls(child, calls));
+}
+
+function extractCallName(expr: ts.Expression): string | null {
+  // Direct call: foo()
+  if (ts.isIdentifier(expr)) {
+    return expr.text;
+  }
+  // Method call: obj.method() → return "method" (we resolve by name)
+  if (ts.isPropertyAccessExpression(expr) && ts.isIdentifier(expr.name)) {
+    // Skip console.log, JSON.parse, etc.
+    if (ts.isIdentifier(expr.expression) && SKIP_CALL_NAMES.has(expr.expression.text)) {
+      return null;
+    }
+    return expr.name.text;
+  }
+  return null;
 }
 
 function getTagName(expr: ts.JsxTagNameExpression): string | null {
@@ -466,11 +560,13 @@ function buildGraph(
         confidence: 1.0,
       });
 
-      // Register in global maps
-      if (sym.isExported) {
-        if (sym.kind === 'component') {
+      // Register in global maps (exported symbols take priority)
+      if (sym.kind === 'component') {
+        if (sym.isExported || !componentMap.has(sym.name)) {
           componentMap.set(sym.name, nodeId);
-        } else if (sym.kind === 'function') {
+        }
+      } else if (sym.kind === 'function') {
+        if (sym.isExported || !functionMap.has(sym.name)) {
           functionMap.set(sym.name, nodeId);
         }
       }
@@ -551,7 +647,145 @@ function buildGraph(
     }
   }
 
+  // Post-pass: create CALLS edges based on function call expressions
+  const seenCallEdges = new Set<string>();
+  for (const [fileRelPath, analysis] of fileAnalyses) {
+    if (analysis.calls.length === 0) continue;
+
+    // Build set of imported names in this file for confidence scoring
+    const importedNames = new Set<string>();
+    for (const imp of analysis.imports) {
+      for (const name of imp.names) importedNames.add(name);
+      if (imp.defaultName) importedNames.add(imp.defaultName);
+    }
+
+    // Build set of local symbol names for same-file detection
+    const localSymbols = new Set(analysis.symbols.map(s => s.name));
+
+    for (const call of analysis.calls) {
+      // Find the enclosing function/component for the call site
+      const callerSym = findEnclosingSymbol(analysis.symbols, call.line);
+      if (!callerSym) continue;
+
+      // Build caller node ID
+      const callerPrefix = callerSym.kind === 'component' ? 'ts:comp' : 'ts:func';
+      const callerNodeId = `${callerPrefix}:${fileRelPath}:${callerSym.name}`;
+
+      // Find target: prefer exported functions/components from other files
+      const targetNodeId = functionMap.get(call.calleeName) || componentMap.get(call.calleeName);
+      if (!targetNodeId || targetNodeId === callerNodeId) continue;
+
+      // Deduplicate edges (same caller → same callee)
+      const edgeKey = `${callerNodeId}→${targetNodeId}`;
+      if (seenCallEdges.has(edgeKey)) continue;
+      seenCallEdges.add(edgeKey);
+
+      // Tiered confidence scoring:
+      //  1.0 — same file (callee defined locally)
+      //  0.9 — callee explicitly imported in this file
+      //  0.7 — cross-file exported match (name-based)
+      let confidence: number;
+      if (localSymbols.has(call.calleeName)) {
+        confidence = 1.0; // Same file, high certainty
+      } else if (importedNames.has(call.calleeName)) {
+        confidence = 0.9; // Explicitly imported
+      } else {
+        confidence = 0.7; // Cross-file global name match
+      }
+
+      relationships.push({
+        id: `rel:ts:${++relCounter}`,
+        type: RelationshipType.CALLS,
+        sourceId: callerNodeId,
+        targetId: targetNodeId,
+        confidence,
+      });
+    }
+  }
+
+  // Post-pass: create EXTENDS / IMPLEMENTS edges from heritage clauses
+  // Build a type map: name → nodeId for classes, interfaces, components
+  const typeMap = new Map<string, string>();
+  for (const [fileRelPath, analysis] of fileAnalyses) {
+    for (const sym of analysis.symbols) {
+      if (sym.kind === 'interface') {
+        const nodeId = `ts:iface:${fileRelPath}:${sym.name}`;
+        if (sym.isExported || !typeMap.has(sym.name)) {
+          typeMap.set(sym.name, nodeId);
+        }
+      } else if (sym.kind === 'component') {
+        const nodeId = `ts:comp:${fileRelPath}:${sym.name}`;
+        if (sym.isExported || !typeMap.has(sym.name)) {
+          typeMap.set(sym.name, nodeId);
+        }
+      } else if (sym.kind === 'type') {
+        const nodeId = `ts:type:${fileRelPath}:${sym.name}`;
+        if (sym.isExported || !typeMap.has(sym.name)) {
+          typeMap.set(sym.name, nodeId);
+        }
+      }
+    }
+  }
+
+  for (const [fileRelPath, analysis] of fileAnalyses) {
+    for (const sym of analysis.symbols) {
+      const sourcePrefix = sym.kind === 'component' ? 'ts:comp'
+        : sym.kind === 'interface' ? 'ts:iface'
+          : sym.kind === 'type' ? 'ts:type'
+            : 'ts:func';
+      const sourceId = `${sourcePrefix}:${fileRelPath}:${sym.name}`;
+
+      // EXTENDS edges
+      if (sym.extends) {
+        for (const parentName of sym.extends) {
+          const targetId = typeMap.get(parentName) || componentMap.get(parentName);
+          if (targetId && targetId !== sourceId) {
+            relationships.push({
+              id: `rel:ts:${++relCounter}`,
+              type: RelationshipType.EXTENDS,
+              sourceId,
+              targetId,
+              confidence: 0.9,
+            });
+          }
+        }
+      }
+
+      // IMPLEMENTS edges
+      if (sym.implements) {
+        for (const ifaceName of sym.implements) {
+          const targetId = typeMap.get(ifaceName);
+          if (targetId && targetId !== sourceId) {
+            relationships.push({
+              id: `rel:ts:${++relCounter}`,
+              type: RelationshipType.IMPLEMENTS,
+              sourceId,
+              targetId,
+              confidence: 0.9,
+            });
+          }
+        }
+      }
+    }
+  }
+
   return { nodes, relationships, componentCount, functionCount };
+}
+
+/**
+ * Find the narrowest function/component symbol that contains the given line.
+ */
+function findEnclosingSymbol(symbols: FileSymbol[], line: number): FileSymbol | null {
+  let best: FileSymbol | null = null;
+  for (const sym of symbols) {
+    if (sym.kind !== 'function' && sym.kind !== 'component') continue;
+    if (sym.startLine <= line && sym.endLine >= line) {
+      if (!best || (sym.endLine - sym.startLine) < (best.endLine - best.startLine)) {
+        best = sym;
+      }
+    }
+  }
+  return best;
 }
 
 /**
