@@ -25,6 +25,12 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: false
+
       - name: Install dependencies
         run: npm ci
 
@@ -32,9 +38,12 @@ jobs:
         run: npm run build
 
       - name: Index codebase
+        id: index
+        continue-on-error: true
         run: npx recon index --force
 
       - name: Run blast radius analysis
+        if: steps.index.outcome == 'success'
         id: analysis
         run: |
           BASE="${{ github.event.pull_request.base.ref }}"
