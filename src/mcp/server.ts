@@ -12,6 +12,8 @@ import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
   ListResourceTemplatesRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { KnowledgeGraph } from '../graph/graph.js';
 import type { VectorStore } from '../search/vector-store.js';
@@ -24,6 +26,7 @@ import {
   getResourceTemplates,
   readResource,
 } from './resources.js';
+import { RECON_PROMPTS, getPromptMessages } from './prompts.js';
 
 const VERSION = '1.0.0';
 
@@ -120,6 +123,24 @@ export function createServer(
         isError: true,
       };
     }
+  });
+
+  // ─── ListPrompts ─────────────────────────────────────────────
+
+  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    prompts: RECON_PROMPTS.map((p) => ({
+      name: p.name,
+      description: p.description,
+      arguments: p.arguments,
+    })),
+  }));
+
+  // ─── GetPrompt ──────────────────────────────────────────────
+
+  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    const messages = getPromptMessages(name, args as Record<string, string>);
+    return { messages };
   });
 
   return server;
