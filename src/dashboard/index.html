@@ -1,33 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recon — Code Intelligence Dashboard</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>&#x1f52c;</text></svg>">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>&#x1f52c;</text></svg>">
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
   <!-- ── Header ─────────────────────────────────────────── -->
   <header class="header">
     <div class="header-left">
       <div class="logo">
-        <svg class="logo-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="11" cy="11" r="7"/>
-          <path d="m20 20-3.5-3.5"/>
-          <circle cx="11" cy="11" r="3" stroke-dasharray="2 2"/>
+        <svg class="logo-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
+          stroke-width="1.5">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+          <circle cx="11" cy="11" r="3" stroke-dasharray="2 2" />
         </svg>
         <span class="logo-text">Recon</span>
       </div>
     </div>
     <div class="header-center">
       <div class="search-wrapper">
-        <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+        <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+          stroke-width="2">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
         </svg>
         <input type="text" id="searchInput" placeholder="Search symbols..." autocomplete="off" spellcheck="false" />
         <kbd class="search-kbd">/</kbd>
+        <div id="searchDropdown" class="search-dropdown hidden"></div>
       </div>
     </div>
     <div class="header-right">
@@ -38,15 +45,28 @@
   <!-- ── Tab Bar ─────────────────────────────────────────── -->
   <nav class="tab-bar">
     <button class="tab active" data-tab="graph">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M8.6 7.4 15.4 16.6M8.6 4.6 15.4 4.6"/></svg>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="6" cy="6" r="3" />
+        <circle cx="18" cy="18" r="3" />
+        <circle cx="18" cy="6" r="3" />
+        <path d="M8.6 7.4 15.4 16.6M8.6 4.6 15.4 4.6" />
+      </svg>
       Graph
     </button>
     <button class="tab" data-tab="processes">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h4m4 0h4m-4-4v8"/><rect x="2" y="9" width="4" height="6" rx="1"/><rect x="18" y="9" width="4" height="6" rx="1"/></svg>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 12h4m4 0h4m-4-4v8" />
+        <rect x="2" y="9" width="4" height="6" rx="1" />
+        <rect x="18" y="9" width="4" height="6" rx="1" />
+      </svg>
       Processes
     </button>
     <button class="tab" data-tab="impact">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10" />
+        <circle cx="12" cy="12" r="6" />
+        <circle cx="12" cy="12" r="2" />
+      </svg>
       Impact
     </button>
   </nav>
@@ -65,7 +85,9 @@
       </div>
       <!-- Graph Legend -->
       <div class="legend-section" id="legendSection">
-        <div class="panel-header"><h2>Legend</h2></div>
+        <div class="panel-header">
+          <h2>Legend</h2>
+        </div>
         <div class="legend-items" id="legendItems"></div>
       </div>
     </aside>
@@ -123,7 +145,10 @@
           <p class="view-desc">Traced call chains from entry points through the codebase</p>
         </div>
         <div id="processesContainer">
-          <div class="loading-spinner"><div class="spinner"></div><p>Detecting processes...</p></div>
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Detecting processes...</p>
+          </div>
         </div>
       </div>
     </section>
@@ -137,7 +162,8 @@
         </div>
         <div class="impact-form">
           <div class="impact-input-row">
-            <input type="text" id="impactTarget" placeholder="Symbol name (e.g. buildGraph, handleToolCall)" autocomplete="off" spellcheck="false" />
+            <input type="text" id="impactTarget" placeholder="Symbol name (e.g. buildGraph, handleToolCall)"
+              autocomplete="off" spellcheck="false" />
             <select id="impactDirection" class="toolbar-select">
               <option value="upstream">Upstream (callers)</option>
               <option value="downstream">Downstream (callees)</option>
@@ -156,9 +182,12 @@
       </div>
       <div class="panel-body scrollable" id="detailsContent">
         <div class="placeholder-msg">
-          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
-            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
-            <path d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-7.07-2.83 2.83M9.76 14.24l-2.83 2.83m0-10.14 2.83 2.83m4.48 4.48 2.83 2.83"/>
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1"
+            opacity="0.3">
+            <circle cx="12" cy="12" r="10" />
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-7.07-2.83 2.83M9.76 14.24l-2.83 2.83m0-10.14 2.83 2.83m4.48 4.48 2.83 2.83" />
           </svg>
           <p>Click a node to inspect</p>
         </div>
@@ -176,4 +205,5 @@
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
   <script src="app.js"></script>
 </body>
+
 </html>

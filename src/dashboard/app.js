@@ -744,15 +744,60 @@ function setupControls() {
   });
 
   searchInput.addEventListener('keydown', (e) => {
+    const dropdown = $('searchDropdown');
+    const items = dropdown.querySelectorAll('.search-dropdown-item');
+    const selected = dropdown.querySelector('.search-dropdown-item.selected');
+
+    if (e.key === 'ArrowDown' && !dropdown.classList.contains('hidden')) {
+      e.preventDefault();
+      if (!selected && items.length) { items[0].classList.add('selected'); }
+      else if (selected && selected.nextElementSibling) {
+        selected.classList.remove('selected');
+        selected.nextElementSibling.classList.add('selected');
+        selected.nextElementSibling.scrollIntoView({ block: 'nearest' });
+      }
+      return;
+    }
+    if (e.key === 'ArrowUp' && !dropdown.classList.contains('hidden')) {
+      e.preventDefault();
+      if (selected && selected.previousElementSibling) {
+        selected.classList.remove('selected');
+        selected.previousElementSibling.classList.add('selected');
+        selected.previousElementSibling.scrollIntoView({ block: 'nearest' });
+      }
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleSearch(searchInput.value.trim());
+      if (selected) {
+        selected.click();
+      } else {
+        handleSearch(searchInput.value.trim());
+        hideSearchDropdown();
+      }
+      return;
     }
     if (e.key === 'Escape') {
       searchInput.value = '';
       searchInput.blur();
+      hideSearchDropdown();
       handleSearch('');
+      return;
     }
+  });
+
+  // Debounced live search
+  let searchTimer = null;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = searchInput.value.trim();
+    if (!q) { hideSearchDropdown(); return; }
+    searchTimer = setTimeout(() => showSearchDropdown(q), 200);
+  });
+
+  // Hide dropdown on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-wrapper')) hideSearchDropdown();
   });
 
   document.addEventListener('keydown', (e) => {
@@ -768,6 +813,56 @@ function esc(str) {
   const el = document.createElement('span');
   el.textContent = str;
   return el.innerHTML;
+}
+/* ── Search Dropdown ──────────────────────────────── */
+function showSearchDropdown(query) {
+  const dropdown = $('searchDropdown');
+  const q = query.toLowerCase();
+
+  const matches = graphData.nodes.filter(n =>
+    n.label.toLowerCase().includes(q) ||
+    (n.file && n.file.toLowerCase().includes(q)) ||
+    (n.package && n.package.toLowerCase().includes(q))
+  ).slice(0, 12);
+
+  if (matches.length === 0) {
+    dropdown.innerHTML = '<div class="search-dropdown-empty">No matches in visible graph</div>';
+    dropdown.classList.remove('hidden');
+    return;
+  }
+
+  let html = '';
+  for (const n of matches) {
+    const colors = TYPE_COLORS[n.group] || { bg: '#64748b' };
+    const shortFile = n.file ? n.file.split('/').slice(-2).join('/') : '';
+    html += `<div class="search-dropdown-item" data-id="${esc(n.id)}">
+      <span class="sdi-type" style="background:${colors.bg}20;color:${colors.bg}">${n.group}</span>
+      <span class="sdi-name">${esc(n.label)}</span>
+      <span class="sdi-file">${esc(shortFile)}</span>
+    </div>`;
+  }
+  dropdown.innerHTML = html;
+  dropdown.classList.remove('hidden');
+
+  // Click handlers for dropdown items
+  dropdown.querySelectorAll('.search-dropdown-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      hideSearchDropdown();
+      searchInput.value = el.querySelector('.sdi-name').textContent;
+      if (network) {
+        network.selectNodes([id]);
+        network.focus(id, { scale: 1.2, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+      }
+      showNodeDetails(id);
+    });
+  });
+}
+
+function hideSearchDropdown() {
+  const dropdown = $('searchDropdown');
+  dropdown.classList.add('hidden');
+  dropdown.innerHTML = '';
 }
 
 /* ── Init ─────────────────────────────────────────── */
