@@ -1,5 +1,5 @@
 {
-  "name": "recon",
+  "name": "recon-mcp",
   "version": "5.0.0",
   "description": "Lightweight code intelligence engine for AI agents. Dependency mapping, blast radius analysis, and call graph via MCP.",
   "type": "module",
@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && cp -r src/dashboard dist/dashboard",
+    "build": "tsc && node -e \"const fs=require('fs');fs.cpSync('src/dashboard','dist/dashboard',{recursive:true})\"",
     "dev": "tsc --watch",
     "test": "vitest run",
     "review": "node dist/scripts/pr-review.js",
