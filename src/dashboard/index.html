@@ -35,6 +35,22 @@
     </div>
   </header>
 
+  <!-- ── Tab Bar ─────────────────────────────────────────── -->
+  <nav class="tab-bar">
+    <button class="tab active" data-tab="graph">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M8.6 7.4 15.4 16.6M8.6 4.6 15.4 4.6"/></svg>
+      Graph
+    </button>
+    <button class="tab" data-tab="processes">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h4m4 0h4m-4-4v8"/><rect x="2" y="9" width="4" height="6" rx="1"/><rect x="18" y="9" width="4" height="6" rx="1"/></svg>
+      Processes
+    </button>
+    <button class="tab" data-tab="impact">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      Impact
+    </button>
+  </nav>
+
   <!-- ── Main Layout ────────────────────────────────────── -->
   <main class="layout">
 
@@ -47,44 +63,89 @@
       <div class="panel-body scrollable" id="packageList">
         <div class="placeholder-text">Loading...</div>
       </div>
+      <!-- Graph Legend -->
+      <div class="legend-section" id="legendSection">
+        <div class="panel-header"><h2>Legend</h2></div>
+        <div class="legend-items" id="legendItems"></div>
+      </div>
     </aside>
 
-    <!-- Graph Visualization -->
-    <section class="graph-area">
-      <div class="graph-container" id="graphContainer">
-        <div class="loading-overlay" id="loadingOverlay">
-          <div class="spinner"></div>
-          <p>Loading graph...</p>
+    <!-- ═══ Graph View ═══ -->
+    <section class="view-panel active" id="view-graph">
+      <div class="graph-area">
+        <div class="graph-container" id="graphContainer">
+          <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <p>Loading graph...</p>
+          </div>
+        </div>
+        <div class="graph-toolbar">
+          <div class="toolbar-group">
+            <select id="typeFilter" class="toolbar-select" title="Filter by type">
+              <option value="">All Types</option>
+              <option value="Package">Package</option>
+              <option value="Module">Module</option>
+              <option value="Function">Function</option>
+              <option value="Method">Method</option>
+              <option value="Struct">Struct</option>
+              <option value="Interface">Interface</option>
+              <option value="Class">Class</option>
+              <option value="Component">Component</option>
+              <option value="Type">Type</option>
+              <option value="Enum">Enum</option>
+              <option value="Trait">Trait</option>
+            </select>
+            <select id="limitSelect" class="toolbar-select" title="Max nodes">
+              <option value="100">100 nodes</option>
+              <option value="300" selected>300 nodes</option>
+              <option value="500">500 nodes</option>
+              <option value="1000">1000 nodes</option>
+            </select>
+            <label class="toolbar-toggle" title="Color by community">
+              <input type="checkbox" id="communityToggle" />
+              <span>Communities</span>
+            </label>
+          </div>
+          <div class="toolbar-group">
+            <button id="fitBtn" class="toolbar-btn" title="Fit to view">Fit</button>
+            <button id="physicsBtn" class="toolbar-btn active" title="Toggle physics simulation">Physics</button>
+            <button id="refreshBtn" class="toolbar-btn" title="Reload graph">Reload</button>
+          </div>
         </div>
       </div>
-      <div class="graph-toolbar">
-        <div class="toolbar-group">
-          <select id="typeFilter" class="toolbar-select" title="Filter by type">
-            <option value="">All Types</option>
-            <option value="Package">Package</option>
-            <option value="Module">Module</option>
-            <option value="Function">Function</option>
-            <option value="Method">Method</option>
-            <option value="Struct">Struct</option>
-            <option value="Interface">Interface</option>
-            <option value="Class">Class</option>
-            <option value="Component">Component</option>
-            <option value="Type">Type</option>
-            <option value="Enum">Enum</option>
-            <option value="Trait">Trait</option>
-          </select>
-          <select id="limitSelect" class="toolbar-select" title="Max nodes">
-            <option value="100">100 nodes</option>
-            <option value="300" selected>300 nodes</option>
-            <option value="500">500 nodes</option>
-            <option value="1000">1000 nodes</option>
-          </select>
+    </section>
+
+    <!-- ═══ Processes View ═══ -->
+    <section class="view-panel" id="view-processes">
+      <div class="view-content scrollable">
+        <div class="view-header">
+          <h2>Execution Flows</h2>
+          <p class="view-desc">Traced call chains from entry points through the codebase</p>
         </div>
-        <div class="toolbar-group">
-          <button id="fitBtn" class="toolbar-btn" title="Fit to view">Fit</button>
-          <button id="physicsBtn" class="toolbar-btn active" title="Toggle physics simulation">Physics</button>
-          <button id="refreshBtn" class="toolbar-btn" title="Reload graph">Reload</button>
+        <div id="processesContainer">
+          <div class="loading-spinner"><div class="spinner"></div><p>Detecting processes...</p></div>
         </div>
+      </div>
+    </section>
+
+    <!-- ═══ Impact View ═══ -->
+    <section class="view-panel" id="view-impact">
+      <div class="view-content scrollable">
+        <div class="view-header">
+          <h2>Impact Analysis</h2>
+          <p class="view-desc">Analyze the blast radius before editing a symbol</p>
+        </div>
+        <div class="impact-form">
+          <div class="impact-input-row">
+            <input type="text" id="impactTarget" placeholder="Symbol name (e.g. buildGraph, handleToolCall)" autocomplete="off" spellcheck="false" />
+            <select id="impactDirection" class="toolbar-select">
+              <option value="upstream">Upstream (callers)</option>
+              <option value="downstream">Downstream (callees)</option>
+            </select>
+            <button id="impactBtn" class="accent-btn">Analyze</button>
+          </div>
+        </div>
+        <div id="impactContainer"></div>
       </div>
     </section>
 
