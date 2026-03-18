@@ -26,6 +26,35 @@ export interface ProjectDir {
   repoName: string;  // Name stamped on nodes
 }
 
+export interface WatcherStatus {
+  active: boolean;
+  startedAt: string | null;
+  watchDirs: string[];
+  totalUpdates: number;
+  lastUpdate: {
+    file: string;
+    timestamp: string;
+    durationMs: number;
+  } | null;
+  pendingCount: number;
+  errors: Array<{
+    file: string;
+    error: string;
+    timestamp: string;
+  }>;
+}
+
+/** Shared singleton — imported by MCP handler */
+export const watcherStatus: WatcherStatus = {
+  active: false,
+  startedAt: null,
+  watchDirs: [],
+  totalUpdates: 0,
+  lastUpdate: null,
+  pendingCount: 0,
+  errors: [],
+};
+
 // ─── Supported Extensions ────────────────────────────────────────
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx']);
@@ -96,6 +125,11 @@ export class ReconWatcher {
     const dirNames = this.projectDirs.map(p => p.repoName).join(', ');
     console.error(`[recon:watch] Watching: ${dirNames}`);
 
+    // Update singleton status
+    watcherStatus.active = true;
+    watcherStatus.startedAt = new Date().toISOString();
+    watcherStatus.watchDirs = this.projectDirs.map(p => p.repoName);
+
     // Clean shutdown
     process.on('SIGINT', () => this.stop());
     process.on('SIGTERM', () => this.stop());
@@ -113,6 +147,7 @@ export class ReconWatcher {
       clearTimeout(timer);
     }
     this.debounceTimers.clear();
+    watcherStatus.active = false;
   }
 
   /**
@@ -183,11 +218,28 @@ export class ReconWatcher {
 
       const elapsed = Math.round(performance.now() - startTime);
       console.error(`[recon:watch] Updated ${relPath} (${elapsed}ms)`);
+
+      // Update status singleton
+      watcherStatus.totalUpdates++;
+      watcherStatus.lastUpdate = {
+        file: relPath,
+        timestamp: new Date().toISOString(),
+        durationMs: elapsed,
+      };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error(`[recon:watch] Error processing ${absPath}: ${msg}`);
+
+      // Track error
+      watcherStatus.errors.push({
+        file: absPath,
+        error: msg,
+        timestamp: new Date().toISOString(),
+      });
+      if (watcherStatus.errors.length > 10) watcherStatus.errors.shift();
     } finally {
       this.indexLock = false;
+      watcherStatus.pendingCount = this.pendingQueue.length;
 
       // Process pending queue
       if (this.pendingQueue.length > 0) {

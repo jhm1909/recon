@@ -19,6 +19,7 @@ import { executeQuery as executeCypherQuery, formatResultAsMarkdown } from '../q
 import { listRepos } from '../storage/store.js';
 import { detectProcesses, type Process } from '../graph/process.js';
 import { augment } from './augmentation.js';
+import { watcherStatus } from '../watcher/watcher.js';
 
 /**
  * Filter a graph to only include nodes belonging to a specific repo.
@@ -99,6 +100,9 @@ export async function handleToolCall(
 
     case 'recon_augment':
       return handleAugment(args, graph);
+
+    case 'recon_watcher_status':
+      return formatWatcherStatus();
 
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -1275,4 +1279,43 @@ function handleAugment(
   }
 
   return result;
+}
+
+// ─── recon_watcher_status ─────────────────────────────────────────
+
+function formatWatcherStatus(): string {
+  const s = watcherStatus;
+
+  const statusIcon = s.active ? '✅ Active' : '⏸️ Inactive';
+  const uptime = s.startedAt
+    ? `since ${s.startedAt}`
+    : 'not started';
+
+  const lines: string[] = [
+    `## 🔄 Watcher Status`,
+    '',
+    `**Status:** ${statusIcon} (${uptime})`,
+    `**Watching:** ${s.watchDirs.length > 0 ? s.watchDirs.join(', ') : 'none'}`,
+    '',
+    '| Metric | Value |',
+    '|--------|-------|',
+    `| Total updates | ${s.totalUpdates} |`,
+    `| Pending queue | ${s.pendingCount} |`,
+    `| Errors | ${s.errors.length} |`,
+  ];
+
+  if (s.lastUpdate) {
+    lines.push('');
+    lines.push(`**Last update:** \`${s.lastUpdate.file}\` (${s.lastUpdate.durationMs}ms) at ${s.lastUpdate.timestamp}`);
+  }
+
+  if (s.errors.length > 0) {
+    lines.push('');
+    lines.push('### Recent Errors');
+    for (const err of s.errors.slice(-5)) {
+      lines.push(`- \`${err.file}\`: ${err.error} (${err.timestamp})`);
+    }
+  }
+
+  return lines.join('\n');
 }

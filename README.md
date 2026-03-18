@@ -33,7 +33,7 @@
 
 AI coding agents are **blind to architecture**. They grep, they guess, they break things.
 
-Recon fixes this by indexing your codebase into a **knowledge graph** — functions, classes, call chains, imports, communities — and exposing it through **11 MCP tools**, **3 prompts**, and **5 resources** that any AI agent can query.
+Recon fixes this by indexing your codebase into a **knowledge graph** — functions, classes, call chains, imports, communities — and exposing it through **12 MCP tools**, **3 prompts**, and **5 resources** that any AI agent can query.
 
 > 💡 **One command, full awareness.** Your agent gets dependency mapping, blast radius analysis, safe renames, execution flow tracing, Cypher queries, and hybrid semantic search — without reading every file.
 
@@ -131,7 +131,7 @@ When your AI agent starts:
 3. Recon **auto-indexes** the project (`cwd`) → creates `.recon/` folder
 4. **File watcher** starts → monitors source files for changes
 5. MCP server opens on **stdio** (stdin/stdout) — no network, no port
-6. Agent sees 11 tools + 3 prompts + 5 resources
+6. Agent sees 12 tools + 3 prompts + 5 resources
 7. Agent receives built-in instructions → knows when to use each tool
 8. You edit code → graph updates surgically in ~50ms → agent always has fresh data
 
@@ -328,7 +328,7 @@ With a config file, your MCP setup stays minimal:
 
 ## Tool Reference
 
-All 11 tools accept an optional `repo` parameter for multi-repo filtering.
+All 12 tools accept an optional `repo` parameter for multi-repo filtering.
 
 ### recon_packages
 
@@ -420,6 +420,14 @@ Compact symbol context for AI augmentation — returns callers, callees, process
 
 ```
 recon_augment(pattern: string)
+```
+
+### recon_watcher_status
+
+Get the live status of the file watcher — active state, watched directories, update count, last update, pending queue, and recent errors.
+
+```
+recon_watcher_status()
 ```
 
 ---
@@ -522,7 +530,7 @@ Enable with `recon index --embeddings`, then use `recon_query({query: "...", sem
 │   │   └── watcher.ts            # Live file watcher — surgical graph updates
 │   ├── mcp/
 │   │   ├── server.ts             # MCP server (stdio transport)
-│   │   ├── tools.ts              # 11 tool definitions (JSON Schema)
+│   │   ├── tools.ts              # 12 tool definitions (JSON Schema)
 │   │   ├── handlers.ts           # Tool dispatch + query logic
 │   │   ├── prompts.ts            # 3 MCP prompt templates
 │   │   ├── hints.ts              # Next-step hints for agent guidance
@@ -567,7 +575,7 @@ Enable with `recon index --embeddings`, then use `recon_query({query: "...", sem
                                 ┌─────────┴──────────┐
                            MCP Server (stdio)   HTTP REST API
                          ┌───┴────┐────┐        (:3100 + Dashboard)
-                     11 Tools  3 Prompts  5 Resources
+                     12 Tools  3 Prompts  5 Resources
                          │        │      recon://packages
                    ┌─────┼────┐   │      recon://symbol/{name}
                    │     │    │   │      recon://file/{path}

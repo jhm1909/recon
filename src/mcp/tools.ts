@@ -355,4 +355,16 @@ AFTER THIS: Use recon_context() for full detail, or recon_impact() for blast rad
       required: ['pattern'],
     },
   },
+  {
+    name: 'recon_watcher_status',
+    description: `Get the live status of the file watcher. Shows whether the watcher is active, which directories are being monitored, total files updated, last update details, pending queue, and recent errors.
+
+WHEN TO USE: When you want to verify the watcher is running, check if recent file changes have been processed, or diagnose file watching issues.
+AFTER THIS: Use recon_query() or recon_context() to inspect the updated symbols.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
 ];
