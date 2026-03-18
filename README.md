@@ -91,6 +91,7 @@ recon index && recon serve
 - **MCP Prompts** — guided workflows for impact analysis, architecture docs, onboarding
 - **Framework detection** — automatic entry point multipliers for 20+ frameworks
 - **Live re-index** — file watcher with surgical graph updates (~50ms per file)
+- **Graph auto-save** — persists graph to disk every 5 updates or 30s, survives restarts
 
 </td>
 </tr>
@@ -117,6 +118,7 @@ recon index && recon serve
 | **Cross-language** | Route matching | HTTP API routes mapped from Go handlers to TypeScript consumers |
 
 > Kotlin and Swift require optional grammars: `npm install tree-sitter-kotlin tree-sitter-swift`
+> Go grammar (`tree-sitter-go`) is bundled by default.
 
 ## How It Works
 
@@ -133,7 +135,7 @@ When your AI agent starts:
 5. MCP server opens on **stdio** (stdin/stdout) — no network, no port
 6. Agent sees 12 tools + 3 prompts + 5 resources
 7. Agent receives built-in instructions → knows when to use each tool
-8. You edit code → graph updates surgically in ~50ms → agent always has fresh data
+8. You edit code → graph updates surgically in ~50ms → auto-saved to disk → agent always has fresh data
 
 > **Zero config. Zero commands. Fully automatic.**
 
@@ -257,6 +259,7 @@ Then filter by repo in queries: `recon_query({query: "Auth", repo: "backend"})`.
 | No changes | Uses cached index → instant startup |
 | Force re-index | `recon index --force` |
 | Skip auto-index | `recon serve --no-index` |
+| Index but no watcher | `recon serve --no-watch` |
 
 > **Built-in Instructions:** Recon automatically injects [MCP server instructions](https://modelcontextprotocol.io/docs/concepts/server-instructions) into the agent's system prompt. The agent will proactively use `recon_impact` before editing, `recon_context` for exploration, and `recon_rename` for safe renames — no manual prompting needed.
 
@@ -275,6 +278,7 @@ recon serve --projects ../frontend # Watch additional project directories
 recon serve --http                 # Start HTTP REST API + dashboard on :3100
 recon serve --http --port 8080     # Custom port
 recon serve --no-index             # Skip auto-indexing and file watcher
+recon serve --no-watch             # Auto-index but disable file watcher
 recon serve --repo my-backend      # Serve specific repo only
 
 recon status                       # Show index stats
