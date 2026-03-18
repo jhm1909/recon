@@ -1,6 +1,6 @@
 {
   "name": "recon-mcp",
-  "version": "5.2.0",
+  "version": "5.2.1",
   "description": "Lightweight code intelligence engine for AI agents. Dependency mapping, blast radius analysis, and call graph via MCP.",
   "type": "module",
   "main": "dist/cli/index.js",

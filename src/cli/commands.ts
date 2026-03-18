@@ -24,6 +24,7 @@ import { getAvailableLanguages } from '../analyzers/tree-sitter/index.js';
 import { detectCommunities } from '../graph/community.js';
 import { ReconWatcher } from '../watcher/watcher.js';
 import type { ProjectDir } from '../watcher/watcher.js';
+import { loadConfig, mergeWithCLI, initConfig } from '../config/config.js';
 
 /**
  * Auto-detect where TypeScript source files live.
@@ -422,6 +423,12 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
   const projectRoot = findProjectRoot();
   const repoName = options?.repo;
 
+  // Load .recon.json and merge with CLI flags
+  const fileConfig = loadConfig(projectRoot);
+  const config = mergeWithCLI(fileConfig, options || {});
+
+  // Use config values (CLI overrides already applied)
+  const projects = config.projects;
   // Auto-index: check if index needs (re)building
   if (!options?.noIndex) {
     const existing = await loadIndex(projectRoot, repoName);
@@ -435,8 +442,8 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
     }
 
     // Auto-index external projects
-    if (options?.projects?.length) {
-      for (const projectDir of options.projects) {
+    if (projects.length > 0) {
+      for (const projectDir of projects) {
         const resolvedDir = resolve(projectDir);
         const extRepoName = basename(resolvedDir).toLowerCase();
         const extExisting = await loadIndex(projectRoot, extRepoName);
@@ -503,22 +510,20 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
   } catch { /* ignore staleness errors */ }
 
   // Start file watcher for live re-indexing
-  if (!options?.noIndex) {
+  if (config.watch) {
     const watchDirs: ProjectDir[] = [
       { dir: projectRoot, repoName: basename(projectRoot).toLowerCase() },
     ];
-    if (options?.projects?.length) {
-      for (const dir of options.projects) {
-        watchDirs.push({ dir: resolve(dir), repoName: basename(resolve(dir)).toLowerCase() });
-      }
+    for (const dir of projects) {
+      watchDirs.push({ dir: resolve(dir), repoName: basename(resolve(dir)).toLowerCase() });
     }
-    const watcher = new ReconWatcher(graph, watchDirs);
+    const watcher = new ReconWatcher(graph, watchDirs, config.watchDebounce, config.ignore);
     watcher.start();
   }
 
-  if (options?.http) {
+  if (config.http || options?.http) {
     const { startHttpServer } = await import('../server/http.js');
-    const port = options.port || 3100;
+    const port = options?.port || config.port;
     await startHttpServer({ port, graph, projectRoot, vectorStore });
     // Keep process alive
     await new Promise(() => { });
@@ -587,3 +592,15 @@ export function cleanCommand(options?: { repo?: string }): void {
   }
 }
 
+// ─── Init ─────────────────────────────────────────────────────────
+
+export function initCommandFn(): void {
+  const projectRoot = findProjectRoot();
+  const created = initConfig(projectRoot);
+  if (created) {
+    console.log('[recon] Created .recon.json with defaults.');
+    console.log('[recon] Edit it to add projects, enable embeddings, configure watcher, etc.');
+  } else {
+    console.log('[recon] .recon.json already exists — skipping.');
+  }
+}

@@ -8,7 +8,7 @@
  */
 
 import { Command } from 'commander';
-import { indexCommand, serveCommand, statusCommand, cleanCommand } from './commands.js';
+import { indexCommand, serveCommand, statusCommand, cleanCommand, initCommandFn } from './commands.js';
 
 const program = new Command();
 
@@ -53,6 +53,13 @@ program
   .option('--repo <name>', 'Clean only a specific repo index')
   .action((options) => {
     cleanCommand(options);
+  });
+
+program
+  .command('init')
+  .description('Create a .recon.json config file with defaults')
+  .action(() => {
+    initCommandFn();
   });
 
 program.parse();

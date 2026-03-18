@@ -59,6 +59,7 @@ export class ReconWatcher {
     private graph: KnowledgeGraph,
     private projectDirs: ProjectDir[],
     private debounceMs = 1500,
+    private customIgnore: string[] = [],
   ) {}
 
   /**
@@ -66,6 +67,8 @@ export class ReconWatcher {
    */
   start(): void {
     const watchPaths = this.projectDirs.map(p => p.dir);
+
+    const extraIgnore = this.customIgnore.map(p => new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
     this.watcher = chokidar.watch(watchPaths, {
       ignored: [
@@ -76,6 +79,7 @@ export class ReconWatcher {
         /\.next/,
         /build\//,
         /coverage\//,
+        ...extraIgnore,
       ],
       ignoreInitial: true,
       persistent: true,
