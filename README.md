@@ -117,11 +117,31 @@ recon index && recon serve
 
 > Kotlin and Swift require optional grammars: `npm install tree-sitter-kotlin tree-sitter-swift`
 
+## How It Works
+
+```
+You add MCP config → Agent starts Recon automatically → Done.
+```
+
+When your AI agent starts:
+
+1. Agent reads MCP config → runs `npx recon-mcp serve`
+2. `npx` downloads Recon from npm (cached after first run)
+3. Recon **auto-indexes** the project (`cwd`) → creates `.recon/` folder
+4. MCP server opens on **stdio** (stdin/stdout) — no network, no port
+5. Agent sees 11 tools + 3 prompts + 5 resources
+6. Agent receives built-in instructions → knows when to use each tool
+7. You chat normally → agent calls Recon tools automatically
+
+> **Zero config. Zero commands. Fully automatic.**
+
 ---
 
 ## MCP Integration
 
-Add to your AI agent's MCP config to give it architectural awareness:
+### Single Project
+
+Add to your AI agent's MCP config:
 
 <table>
 <tr>
@@ -162,7 +182,40 @@ Add to your AI agent's MCP config to give it architectural awareness:
 </tr>
 </table>
 
-**Antigravity** (`mcp_config.json`):
+> `cwd` tells Recon **which project to index**. It scans code from this directory and creates `.recon/` there.
+
+### Multiple Projects
+
+If you have separate projects (e.g., a backend and a frontend), add one entry per project:
+
+```json
+{
+  "mcpServers": {
+    "recon-backend": {
+      "command": "npx",
+      "args": ["recon-mcp", "serve"],
+      "cwd": "/path/to/backend"
+    },
+    "recon-frontend": {
+      "command": "npx",
+      "args": ["recon-mcp", "serve"],
+      "cwd": "/path/to/frontend"
+    }
+  }
+}
+```
+
+Each project gets its own Recon server, its own `.recon/` index, and its own set of tools. The agent automatically picks the right server based on context.
+
+### Multi-Repo (Merged Graph)
+
+For cross-project queries (e.g., tracing API calls from frontend to backend), use multi-repo mode:
+
+```bash
+# Index each project with a name
+cd /path/to/backend  && npx recon-mcp index --repo backend
+cd /path/to/frontend && npx recon-mcp index --repo frontend
+```
 
 ```json
 {
@@ -170,11 +223,25 @@ Add to your AI agent's MCP config to give it architectural awareness:
     "recon": {
       "command": "npx",
       "args": ["recon-mcp", "serve"],
-      "cwd": "/path/to/your/project"
+      "cwd": "/path/to/backend"
     }
   }
 }
 ```
+
+Then filter by repo in queries: `recon_query({query: "Auth", repo: "backend"})`. Use `recon_list_repos` to see all indexed repos.
+
+### Auto-Indexing
+
+`recon serve` handles indexing automatically:
+
+| Scenario | Behavior |
+|----------|----------|
+| First run (no `.recon/`) | Full index → creates `.recon/` |
+| Code changed since last index | Incremental re-index (only changed files) |
+| No changes | Uses cached index → instant startup |
+| Force re-index | `recon index --force` |
+| Skip auto-index | `recon serve --no-index` |
 
 > **Built-in Instructions:** Recon automatically injects [MCP server instructions](https://modelcontextprotocol.io/docs/concepts/server-instructions) into the agent's system prompt. The agent will proactively use `recon_impact` before editing, `recon_context` for exploration, and `recon_rename` for safe renames — no manual prompting needed.
 
