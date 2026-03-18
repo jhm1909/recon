@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Code intelligence engine for AI agents</strong><br/>
-  Knowledge graph · 13 languages · MCP + REST · Interactive dashboard
+  Knowledge graph · 13 languages · Live re-index · MCP + REST · Interactive dashboard
 </p>
 
 <p align="center">
@@ -89,7 +89,7 @@ recon index && recon serve
 - **MCP Resources** — `recon://` URIs for packages, symbols, files, processes, stats
 - **MCP Prompts** — guided workflows for impact analysis, architecture docs, onboarding
 - **Framework detection** — automatic entry point multipliers for 20+ frameworks
-- **Incremental indexing** — sub-second re-index on file changes
+- **Live re-index** — file watcher with surgical graph updates (~50ms per file)
 
 </td>
 </tr>
@@ -128,10 +128,11 @@ When your AI agent starts:
 1. Agent reads MCP config → runs `npx recon-mcp serve`
 2. `npx` downloads Recon from npm (cached after first run)
 3. Recon **auto-indexes** the project (`cwd`) → creates `.recon/` folder
-4. MCP server opens on **stdio** (stdin/stdout) — no network, no port
-5. Agent sees 11 tools + 3 prompts + 5 resources
-6. Agent receives built-in instructions → knows when to use each tool
-7. You chat normally → agent calls Recon tools automatically
+4. **File watcher** starts → monitors source files for changes
+5. MCP server opens on **stdio** (stdin/stdout) — no network, no port
+6. Agent sees 11 tools + 3 prompts + 5 resources
+7. Agent receives built-in instructions → knows when to use each tool
+8. You edit code → graph updates surgically in ~50ms → agent always has fresh data
 
 > **Zero config. Zero commands. Fully automatic.**
 
@@ -186,7 +187,23 @@ Add to your AI agent's MCP config:
 
 ### Multiple Projects
 
-If you have separate projects (e.g., a backend and a frontend), add one entry per project:
+Index and watch multiple projects from a single Recon server using `--projects`:
+
+```json
+{
+  "mcpServers": {
+    "recon": {
+      "command": "npx",
+      "args": ["recon-mcp", "serve", "--projects", "/path/to/frontend"],
+      "cwd": "/path/to/backend"
+    }
+  }
+}
+```
+
+This creates a **merged graph** — both projects are indexed, watched, and querable from a single MCP server. Use `recon_list_repos` to see all repos, and the `repo` parameter on any tool to filter.
+
+Alternatively, run separate servers per project:
 
 ```json
 {
@@ -203,9 +220,6 @@ If you have separate projects (e.g., a backend and a frontend), add one entry pe
     }
   }
 }
-```
-
-Each project gets its own Recon server, its own `.recon/` index, and its own set of tools. The agent automatically picks the right server based on context.
 
 ### Multi-Repo (Merged Graph)
 
@@ -255,10 +269,11 @@ recon index --force                # Force full re-index
 recon index --repo my-backend      # Index as named repo (multi-repo)
 recon index --embeddings           # Include vector embeddings for semantic search
 
-recon serve                        # Start MCP server on stdio (auto-indexes)
+recon serve                        # Start MCP server on stdio (auto-indexes + live watcher)
+recon serve --projects ../frontend # Watch additional project directories
 recon serve --http                 # Start HTTP REST API + dashboard on :3100
 recon serve --http --port 8080     # Custom port
-recon serve --no-index             # Skip auto-indexing
+recon serve --no-index             # Skip auto-indexing and file watcher
 recon serve --repo my-backend      # Serve specific repo only
 
 recon status                       # Show index stats
@@ -459,9 +474,11 @@ Enable with `recon index --embeddings`, then use `recon_query({query: "...", sem
 │   │   ├── framework-detection.ts # 20+ framework entry point detection
 │   │   └── tree-sitter/          # Multi-language tree-sitter analyzer
 │   ├── graph/
-│   │   ├── graph.ts              # KnowledgeGraph — in-memory Map + adjacency
+│   │   ├── graph.ts              # KnowledgeGraph — in-memory Map + adjacency + version
 │   │   ├── community.ts          # Label propagation community detection
 │   │   └── process.ts            # Execution flow detection (BFS)
+│   ├── watcher/
+│   │   └── watcher.ts            # Live file watcher — surgical graph updates
 │   ├── mcp/
 │   │   ├── server.ts             # MCP server (stdio transport)
 │   │   ├── tools.ts              # 11 tool definitions (JSON Schema)
@@ -502,6 +519,10 @@ Enable with `recon index --embeddings`, then use `recon_query({query: "...", sem
                                      + Embeddings
                                      + Processes
                                           │
+                                  ┌───────┤
+                          File Watcher (chokidar)
+                          surgical update ~50ms/file
+                                          │
                                 ┌─────────┴──────────┐
                            MCP Server (stdio)   HTTP REST API
                          ┌───┴────┐────┐        (:3100 + Dashboard)
@@ -509,8 +530,8 @@ Enable with `recon index --embeddings`, then use `recon_query({query: "...", sem
                          │        │      recon://packages
                    ┌─────┼────┐   │      recon://symbol/{name}
                    │     │    │   │      recon://file/{path}
-               Claude  Cursor …   │      recon://process/{name}
-                Code  Antigravity │      recon://stats
+                Claude  Cursor …   │      recon://process/{name}
+                 Code  Antigravity │      recon://stats
                                   │
                           detect_impact
                           generate_map
@@ -620,9 +641,26 @@ After indexing, Recon automatically detects code communities using the **Label P
 
 ---
 
-## Incremental Indexing
+## Live Re-Indexing
 
-Files are hashed with SHA-256. On re-index, only changed files are re-analyzed:
+Recon watches source files and updates the knowledge graph **in real-time**:
+
+| Feature | Detail |
+|---------|--------|
+| **File watcher** | chokidar v4 with 1.5s debounce, `awaitWriteFinish` for atomic writes |
+| **Surgical update** | Remove old nodes → re-parse single file → insert new nodes + edges |
+| **Speed** | ~50ms per file change |
+| **TS files** | Full re-analysis: symbols, imports, calls, JSX components |
+| **Tree-sitter files** | Full re-analysis: symbols, calls, heritage, methods (Python, Rust, Java, etc.) |
+| **Edge reconstruction** | CALLS, IMPORTS, HAS_METHOD, EXTENDS, IMPLEMENTS, USES_COMPONENT |
+| **Incoming callers** | Automatically re-linked after update |
+| **BM25 cache** | Auto-invalidated via graph version counter |
+| **Multi-project** | `--projects` flag watches additional directories |
+| **Ignored** | `node_modules/`, `.git/`, `dist/`, `.next/`, `build/`, `coverage/` |
+
+### Incremental Indexing
+
+Files are hashed with SHA-256. On `recon index`, only changed files are re-analyzed:
 
 - **TypeScript**: per-file granularity via Compiler API
 - **Tree-sitter**: per-file granularity for all 13 languages
