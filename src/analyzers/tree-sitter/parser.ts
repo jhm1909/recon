@@ -20,6 +20,7 @@ let languagesLoaded = false;
  * File extension → Language mapping for tree-sitter supported languages.
  */
 const EXTENSION_MAP: Record<string, Language> = {
+  '.go': Language.Go,
   '.py': Language.Python,
   '.pyw': Language.Python,
   '.rs': Language.Rust,
@@ -58,6 +59,7 @@ function loadLanguages(): void {
   languagesLoaded = true;
 
   const loaders: [Language, () => any][] = [
+    [Language.Go, () => _require('tree-sitter-go')],
     [Language.Python, () => _require('tree-sitter-python')],
     [Language.Rust, () => _require('tree-sitter-rust')],
     [Language.Java, () => _require('tree-sitter-java')],

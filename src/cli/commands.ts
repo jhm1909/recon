@@ -419,7 +419,7 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
 
 // ??? serve command ???????????????????????????????????????????????
 
-export async function serveCommand(options?: { repo?: string; http?: boolean; port?: number; noIndex?: boolean; projects?: string[] }): Promise<void> {
+export async function serveCommand(options?: { repo?: string; http?: boolean; port?: number; noIndex?: boolean; noWatch?: boolean; projects?: string[] }): Promise<void> {
   const projectRoot = findProjectRoot();
   const repoName = options?.repo;
 

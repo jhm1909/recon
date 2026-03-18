@@ -72,6 +72,12 @@ recon_detect_changes()                                               → Verify
 recon_detect_changes({scope: "staged"})  → What do staged changes affect?
 recon_context({name: "<risky_symbol>"})  → Deep-dive on high-risk items
 
+### Pattern E: Monitor Watcher
+recon_watcher_status()  → Check if file watcher is active and healthy
+
+### Pattern F: Quick Symbol Lookup
+recon_augment({pattern: "<name>"})  → Rapid context: callers, callees, community
+
 ## ADVANCED QUERIES
 
 For complex structural questions, use recon_query_graph with Cypher-like syntax:

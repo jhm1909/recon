@@ -78,6 +78,7 @@ export function mergeWithCLI(
     http?: boolean;
     port?: number;
     noIndex?: boolean;
+    noWatch?: boolean;
     force?: boolean;
     repo?: string;
   },
@@ -89,8 +90,8 @@ export function mergeWithCLI(
     ...(cli.embeddings !== undefined ? { embeddings: cli.embeddings } : {}),
     ...(cli.http !== undefined ? { http: cli.http } : {}),
     ...(cli.port !== undefined ? { port: cli.port } : {}),
-    // --no-index disables watcher too
-    ...(cli.noIndex ? { watch: false } : {}),
+    // --no-index disables watcher too; --no-watch disables watcher only
+    ...((cli.noIndex || cli.noWatch) ? { watch: false } : {}),
   };
 }
 

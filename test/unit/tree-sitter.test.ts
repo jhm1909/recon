@@ -47,7 +47,6 @@ describe('getLanguageForFile', () => {
   });
 
   it('returns undefined for unsupported extensions', () => {
-    expect(getLanguageForFile('file.go')).toBeUndefined();
     expect(getLanguageForFile('file.ts')).toBeUndefined();
     expect(getLanguageForFile('file.txt')).toBeUndefined();
     expect(getLanguageForFile('Makefile')).toBeUndefined();
@@ -124,8 +123,8 @@ describe('parser availability', () => {
     expect(isLanguageAvailable(Language.Cpp)).toBe(true);
   });
 
-  it('does not report Go as tree-sitter available (uses dedicated analyzer)', () => {
-    expect(isLanguageAvailable(Language.Go)).toBe(false);
+  it('reports Go as available', () => {
+    expect(isLanguageAvailable(Language.Go)).toBe(true);
   });
 });
 
