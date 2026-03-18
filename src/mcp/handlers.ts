@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MCP Tool Handlers
  *
  * Dispatches tool calls to the appropriate query functions.
@@ -491,16 +491,16 @@ function handleContext(
 
 // ??? recon_query ???????????????????????????????????????????????
 
-// Lazy-initialized BM25 index (rebuilt when graph size changes)
+// Lazy-initialized BM25 index (rebuilt when graph is mutated)
 let _searchIndex: BM25Index | null = null;
-let _searchGraphSize = -1;
+let _searchGraphVersion = -1;
 
 function getSearchIndex(graph: KnowledgeGraph): BM25Index {
-  if (_searchIndex && _searchGraphSize === graph.nodeCount) {
+  if (_searchIndex && _searchGraphVersion === graph.version) {
     return _searchIndex;
   }
   _searchIndex = BM25Index.buildFromGraph(graph);
-  _searchGraphSize = graph.nodeCount;
+  _searchGraphVersion = graph.version;
   return _searchIndex;
 }
 

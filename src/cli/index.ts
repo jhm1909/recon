@@ -34,6 +34,7 @@ program
   .option('--http', 'Start HTTP REST API server instead of MCP stdio')
   .option('--port <number>', 'Port for HTTP server (default: 3100)', parseInt)
   .option('--no-index', 'Skip auto-indexing, use existing index as-is')
+  .option('--projects <dirs...>', 'Additional project directories to auto-index and serve')
   .action(async (options) => {
     await serveCommand({ ...options, noIndex: options.index === false });
   });

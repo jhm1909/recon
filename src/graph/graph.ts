@@ -21,15 +21,20 @@ export class KnowledgeGraph {
   private _incoming = new Map<string, Relationship[]>();
   private _outgoing = new Map<string, Relationship[]>();
 
+  // Mutation counter — used by BM25 to detect graph changes
+  private _version = 0;
+
   // ─── Mutations ──────────────────────────────────────────────
 
   addNode(node: Node): void {
     this.nodes.set(node.id, node);
+    this._version++;
   }
 
   addRelationship(rel: Relationship): void {
     this.relationships.set(rel.id, rel);
     this._addToAdjacency(rel);
+    this._version++;
   }
 
   removeNodesByFile(file: string): number {
@@ -63,6 +68,7 @@ export class KnowledgeGraph {
 
     // Rebuild adjacency index (simpler than partial updates for deletion)
     this.buildAdjacencyIndex();
+    this._version++;
 
     return nodeIdsToRemove.size;
   }
@@ -114,6 +120,10 @@ export class KnowledgeGraph {
 
   get relationshipCount(): number {
     return this.relationships.size;
+  }
+
+  get version(): number {
+    return this._version;
   }
 
   // ─── Adjacency Index ───────────────────────────────────────

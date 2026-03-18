@@ -1,4 +1,4 @@
-﻿/**
+/**
  * CLI Commands
  *
  * Implementation of index, serve, status, clean commands.
@@ -6,7 +6,7 @@
 
 import { execSync } from 'node:child_process';
 import { rmSync, existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, basename } from 'node:path';
 import { KnowledgeGraph } from '../graph/graph.js';
 import { analyzeTypeScript } from '../analyzers/ts-analyzer.js';
 import { buildCrossLanguageEdges, extractGoRoutes } from '../analyzers/cross-language.js';
@@ -22,6 +22,8 @@ import { initEmbedder, embedBatch, disposeEmbedder, DEFAULT_CONFIG } from '../se
 import { analyzeTreeSitter } from '../analyzers/tree-sitter/index.js';
 import { getAvailableLanguages } from '../analyzers/tree-sitter/index.js';
 import { detectCommunities } from '../graph/community.js';
+import { ReconWatcher } from '../watcher/watcher.js';
+import type { ProjectDir } from '../watcher/watcher.js';
 
 /**
  * Auto-detect where TypeScript source files live.
@@ -70,6 +72,120 @@ function getGitInfo(cwd: string): { commit: string; branch: string } {
   } catch {
     return { commit: 'unknown', branch: 'unknown' };
   }
+}
+
+// ─── indexProject: index an external directory ──────────────────
+
+/**
+ * Index an external project directory and save the result under
+ * the main project's .recon/repos/{repoName}/ directory.
+ *
+ * This enables multi-project support: the MCP server can serve
+ * a merged knowledge graph from multiple codebases.
+ */
+export async function indexProject(
+  projectDir: string,
+  mainProjectRoot: string,
+  repoName?: string,
+): Promise<void> {
+  const resolvedDir = resolve(projectDir);
+  const name = repoName || basename(resolvedDir);
+
+  if (!existsSync(resolvedDir)) {
+    console.error(`[recon] Project directory not found: ${resolvedDir}`);
+    return;
+  }
+
+  const startTime = performance.now();
+  console.error(`[recon] Indexing external project: ${resolvedDir} (repo: ${name})...`);
+
+  // Build graph
+  const graph = new KnowledgeGraph();
+
+  // TypeScript analysis
+  const webAppRelPath = detectWebAppPath(resolvedDir);
+  const tsResult = await analyzeTypeScript(resolvedDir, webAppRelPath);
+
+  for (const node of tsResult.result.nodes) {
+    graph.addNode(node);
+  }
+  for (const rel of tsResult.result.relationships) {
+    graph.addRelationship(rel);
+  }
+
+  // Tree-sitter analysis
+  const tsitterLangs = getAvailableLanguages();
+  let tsitterSymbols = 0;
+  let tsitterFiles = 0;
+  let tsitterHashes: Record<string, string> = {};
+  if (tsitterLangs.length > 0) {
+    const tsitterResult = analyzeTreeSitter(resolvedDir);
+    for (const node of tsitterResult.result.nodes) {
+      graph.addNode(node);
+    }
+    for (const rel of tsitterResult.result.relationships) {
+      graph.addRelationship(rel);
+    }
+    tsitterSymbols = tsitterResult.stats.symbols;
+    tsitterFiles = tsitterResult.stats.files;
+    tsitterHashes = tsitterResult.fileHashes;
+  }
+
+  // Cross-language analysis
+  const existingNodeIds = new Set<string>();
+  for (const [id] of graph.nodes) existingNodeIds.add(id);
+  const crossLangResult = buildCrossLanguageEdges(resolvedDir, existingNodeIds);
+  for (const node of crossLangResult.result.nodes) {
+    graph.addNode(node);
+  }
+  for (const rel of crossLangResult.result.relationships) {
+    graph.addRelationship(rel);
+  }
+
+  // Git info
+  const git = getGitInfo(resolvedDir);
+  const elapsed = Math.round(performance.now() - startTime);
+
+  const meta: IndexMeta = {
+    version: 1,
+    indexedAt: new Date().toISOString(),
+    gitCommit: git.commit,
+    gitBranch: git.branch,
+    stats: {
+      tsModules: tsResult.stats.files + tsResult.stats.skipped,
+      tsSymbols: tsResult.stats.components + tsResult.stats.functions,
+      treeSitterFiles: tsitterFiles,
+      treeSitterSymbols: tsitterSymbols,
+      relationships: graph.relationshipCount,
+      indexTimeMs: elapsed,
+    },
+    fileHashes: { ...tsResult.fileHashes, ...tsitterHashes },
+    apiRoutes: crossLangResult.routes.map(r => ({
+      method: r.method,
+      pattern: r.pattern,
+      handler: r.handler,
+    })),
+  };
+
+  // Community detection
+  detectCommunities(graph);
+
+  // Stamp repo name on all nodes
+  for (const node of graph.nodes.values()) {
+    node.repo = name;
+  }
+
+  // Save under MAIN project's .recon/repos/{name}/
+  await saveIndex(mainProjectRoot, graph, meta, name);
+
+  // Build and save BM25 search index
+  const searchIndex = BM25Index.buildFromGraph(graph);
+  await saveSearchIndex(mainProjectRoot, searchIndex, name);
+
+  console.error(
+    `[recon] External project '${name}': ${graph.nodeCount} nodes, ` +
+    `${graph.relationshipCount} rels, ${elapsed}ms`,
+  );
 }
 
 // ??? index command ???????????????????????????????????????????????
@@ -302,7 +418,7 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
 
 // ??? serve command ???????????????????????????????????????????????
 
-export async function serveCommand(options?: { repo?: string; http?: boolean; port?: number; noIndex?: boolean }): Promise<void> {
+export async function serveCommand(options?: { repo?: string; http?: boolean; port?: number; noIndex?: boolean; projects?: string[] }): Promise<void> {
   const projectRoot = findProjectRoot();
   const repoName = options?.repo;
 
@@ -316,6 +432,25 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
       const reason = !existing ? 'no index found' : 'index is stale';
       console.error(`[recon] Auto-indexing (${reason})...`);
       await indexCommand({ force: !existing, repo: repoName });
+    }
+
+    // Auto-index external projects
+    if (options?.projects?.length) {
+      for (const projectDir of options.projects) {
+        const resolvedDir = resolve(projectDir);
+        const extRepoName = basename(resolvedDir).toLowerCase();
+        const extExisting = await loadIndex(projectRoot, extRepoName);
+        const extGit = getGitInfo(resolvedDir);
+        const extNeedsIndex = !extExisting || extExisting.meta.gitCommit !== extGit.commit;
+
+        if (extNeedsIndex) {
+          const reason = !extExisting ? 'no index found' : 'index is stale';
+          console.error(`[recon] Auto-indexing external project '${extRepoName}' (${reason})...`);
+          await indexProject(resolvedDir, projectRoot, extRepoName);
+        } else {
+          console.error(`[recon] External project '${extRepoName}' index is current.`);
+        }
+      }
     }
   }
 
@@ -366,6 +501,20 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
       }
     }
   } catch { /* ignore staleness errors */ }
+
+  // Start file watcher for live re-indexing
+  if (!options?.noIndex) {
+    const watchDirs: ProjectDir[] = [
+      { dir: projectRoot, repoName: basename(projectRoot).toLowerCase() },
+    ];
+    if (options?.projects?.length) {
+      for (const dir of options.projects) {
+        watchDirs.push({ dir: resolve(dir), repoName: basename(resolve(dir)).toLowerCase() });
+      }
+    }
+    const watcher = new ReconWatcher(graph, watchDirs);
+    watcher.start();
+  }
 
   if (options?.http) {
     const { startHttpServer } = await import('../server/http.js');
