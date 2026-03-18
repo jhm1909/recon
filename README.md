@@ -20,6 +20,7 @@
 <p align="center">
   <a href="#quick-start">Quick Start</a> ·
   <a href="#features">Features</a> ·
+  <a href="#configuration">Config</a> ·
   <a href="#mcp-integration">MCP Setup</a> ·
   <a href="#tool-reference">Tools</a> ·
   <a href="#dashboard">Dashboard</a> ·
@@ -279,9 +280,49 @@ recon serve --repo my-backend      # Serve specific repo only
 recon status                       # Show index stats
 recon status --repo my-backend     # Status for specific repo
 recon clean                        # Delete index
+recon init                         # Create .recon.json config file
 ```
 
 > **Auto-index:** `serve` checks if the index is up-to-date with the current Git commit. If stale, it re-indexes automatically before starting. Use `--no-index` to skip.
+
+---
+
+## Configuration
+
+Create a `.recon.json` at your project root to persist settings:
+
+```bash
+recon init  # Creates .recon.json with defaults
+```
+
+```jsonc
+// .recon.json
+{
+  "projects": ["../frontend"],   // Additional dirs to index + watch
+  "embeddings": false,           // Enable vector embeddings
+  "watch": true,                 // Enable live file watcher
+  "watchDebounce": 1500,         // Debounce interval (ms)
+  "ignore": ["generated/"]       // Extra paths to ignore
+}
+```
+
+**Priority:** CLI flags always override `.recon.json`, which overrides defaults.
+
+With a config file, your MCP setup stays minimal:
+
+```json
+{
+  "mcpServers": {
+    "recon": {
+      "command": "npx",
+      "args": ["recon-mcp", "serve"],
+      "cwd": "/path/to/project"
+    }
+  }
+}
+```
+
+> No more long `args` arrays — all config lives in `.recon.json`.
 
 ---
 
