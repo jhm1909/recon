@@ -18,6 +18,8 @@ import { KnowledgeGraph } from '../graph/graph.js';
 import { NodeType, RelationshipType, Language } from '../graph/types.js';
 import { extractFromFile } from '../analyzers/tree-sitter/extractor.js';
 import { getLanguageForFile, isLanguageAvailable } from '../analyzers/tree-sitter/parser.js';
+import { saveIndex } from '../storage/store.js';
+import type { IndexMeta } from '../storage/types.js';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -83,12 +85,18 @@ export class ReconWatcher {
   private debounceTimers = new Map<string, NodeJS.Timeout>();
   private indexLock = false;
   private pendingQueue: Array<{ absPath: string; repoName: string }> = [];
+  private unsavedUpdates = 0;
+  private saveTimer: NodeJS.Timeout | null = null;
+  private readonly SAVE_EVERY_N = 5;
+  private readonly SAVE_INTERVAL_MS = 30_000;
+  private isSaving = false;
 
   constructor(
     private graph: KnowledgeGraph,
     private projectDirs: ProjectDir[],
     private debounceMs = 1500,
     private customIgnore: string[] = [],
+    private projectRoot?: string,
   ) {}
 
   /**
@@ -130,9 +138,13 @@ export class ReconWatcher {
     watcherStatus.startedAt = new Date().toISOString();
     watcherStatus.watchDirs = this.projectDirs.map(p => p.repoName);
 
-    // Clean shutdown
-    process.on('SIGINT', () => this.stop());
-    process.on('SIGTERM', () => this.stop());
+    // Clean shutdown — persist before exit
+    const shutdown = async () => {
+      await this.persistGraph();
+      this.stop();
+    };
+    process.on('SIGINT', () => void shutdown());
+    process.on('SIGTERM', () => void shutdown());
   }
 
   /**
@@ -147,7 +159,52 @@ export class ReconWatcher {
       clearTimeout(timer);
     }
     this.debounceTimers.clear();
+    if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
     watcherStatus.active = false;
+  }
+
+  // ─── Auto-Save ──────────────────────────────────────────────────
+
+  private maybeAutoSave(): void {
+    this.unsavedUpdates++;
+
+    if (this.unsavedUpdates >= this.SAVE_EVERY_N) {
+      void this.persistGraph();
+      return;
+    }
+
+    // Schedule periodic save if not already scheduled
+    if (!this.saveTimer) {
+      this.saveTimer = setTimeout(() => void this.persistGraph(), this.SAVE_INTERVAL_MS);
+    }
+  }
+
+  private async persistGraph(): Promise<void> {
+    if (!this.projectRoot || this.unsavedUpdates === 0 || this.isSaving) return;
+
+    if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
+
+    const count = this.unsavedUpdates;
+    this.unsavedUpdates = 0;
+    this.isSaving = true;
+
+    try {
+      const meta: IndexMeta = {
+        version: 1,
+        indexedAt: new Date().toISOString(),
+        gitCommit: 'watcher',
+        gitBranch: 'live',
+        stats: { tsModules: 0, tsSymbols: 0, relationships: 0, indexTimeMs: 0 },
+        fileHashes: {},
+      };
+      await saveIndex(this.projectRoot, this.graph, meta);
+      console.error(`[recon:watch] Auto-saved graph (${count} updates)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[recon:watch] Auto-save failed: ${msg}`);
+    } finally {
+      this.isSaving = false;
+    }
   }
 
   /**
@@ -226,6 +283,8 @@ export class ReconWatcher {
         timestamp: new Date().toISOString(),
         durationMs: elapsed,
       };
+
+      this.maybeAutoSave();
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error(`[recon:watch] Error processing ${absPath}: ${msg}`);

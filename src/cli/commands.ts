@@ -517,7 +517,7 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
     for (const dir of projects) {
       watchDirs.push({ dir: resolve(dir), repoName: basename(resolve(dir)).toLowerCase() });
     }
-    const watcher = new ReconWatcher(graph, watchDirs, config.watchDebounce, config.ignore);
+    const watcher = new ReconWatcher(graph, watchDirs, config.watchDebounce, config.ignore, projectRoot);
     watcher.start();
   }
 
