@@ -92,6 +92,7 @@ recon index && recon serve
 - **Framework detection** — automatic entry point multipliers for 20+ frameworks
 - **Live re-index** — file watcher with surgical graph updates (~50ms per file)
 - **Graph auto-save** — persists graph to disk every 5 updates or 30s, survives restarts
+- **Graph export** — Mermaid flowchart or Graphviz DOT, filterable by package/symbol/type
 
 </td>
 </tr>
@@ -130,6 +131,26 @@ npm install @huggingface/transformers
 
 Recon **auto-detects** it and enables hybrid BM25 + vector search with [all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2) embeddings. No extra config or flags needed — just install and re-index.
 
+## Graph Export
+
+Export the knowledge graph as **Mermaid** (paste in GitHub PRs/docs) or **Graphviz DOT** (render to SVG):
+
+```bash
+# Mermaid flowchart for a package
+recon export --package mcp --limit 20
+
+# DOT ego graph around a symbol
+recon export --format dot --symbol handleQuery --depth 2
+
+# Filter by node types and edge types
+recon export --type Function,Interface --edges CALLS
+
+# Pipe DOT to SVG
+recon export --format dot | dot -Tsvg > architecture.svg
+```
+
+Also available as MCP tool `recon_export` — agents can generate diagrams directly in conversation.
+
 ## How It Works
 
 ```
@@ -143,7 +164,7 @@ When your AI agent starts:
 3. Recon **auto-indexes** the project (`cwd`) → creates `.recon/` folder
 4. **File watcher** starts → monitors source files for changes
 5. MCP server opens on **stdio** (stdin/stdout) — no network, no port
-6. Agent sees 12 tools + 3 prompts + 5 resources
+6. Agent sees 13 tools + 3 prompts + 5 resources
 7. Agent receives built-in instructions → knows when to use each tool
 8. You edit code → graph updates surgically in ~50ms → auto-saved to disk → agent always has fresh data
 
