@@ -120,6 +120,16 @@ recon index && recon serve
 > Kotlin and Swift require optional grammars: `npm install tree-sitter-kotlin tree-sitter-swift`
 > Go grammar (`tree-sitter-go`) is bundled by default.
 
+## Enhanced Search (Optional)
+
+By default, Recon uses **BM25 keyword search**. For **hybrid semantic search** (find conceptually similar code, not just exact name matches), install one optional package:
+
+```bash
+npm install @huggingface/transformers
+```
+
+Recon **auto-detects** it and enables hybrid BM25 + vector search with [all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2) embeddings. No extra config or flags needed — just install and re-index.
+
 ## How It Works
 
 ```

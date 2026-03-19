@@ -367,7 +367,21 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
   console.log(`[recon] Search index: ${searchIndex.documentCount} documents`);
 
   // Embedding pipeline (optional)
-  if (options.embeddings) {
+  // Embedding pipeline — auto-detect @huggingface/transformers
+  let doEmbeddings = options.embeddings ?? false;
+
+  if (!doEmbeddings) {
+    // Auto-detect: if @huggingface/transformers is installed, enable embeddings
+    try {
+      await (Function('return import("@huggingface/transformers")')() as Promise<any>);
+      doEmbeddings = true;
+      console.log('[recon] Found @huggingface/transformers — enabling semantic search.');
+    } catch {
+      // Not installed — stay BM25 only
+    }
+  }
+
+  if (doEmbeddings) {
     console.log('[recon] Generating embeddings...');
     try {
       await initEmbedder();
@@ -495,6 +509,13 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
 
   if (vectorStore) {
     console.error(`[recon] Loaded ${vectorStore.size} embeddings (${vectorStore.dimensions}d)`);
+    // Try to init embedder for query-time hybrid search
+    try {
+      await initEmbedder();
+      console.error('[recon] Embedder ready — hybrid search enabled.');
+    } catch {
+      console.error('[recon] Embedder not available — BM25-only search. Install @huggingface/transformers for hybrid.');
+    }
   }
 
   // Staleness check
