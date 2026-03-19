@@ -8,7 +8,7 @@
  */
 
 import { Command } from 'commander';
-import { indexCommand, serveCommand, statusCommand, cleanCommand, initCommandFn } from './commands.js';
+import { indexCommand, serveCommand, statusCommand, cleanCommand, initCommandFn, exportCommand } from './commands.js';
 
 const program = new Command();
 
@@ -38,6 +38,22 @@ program
   .option('--projects <dirs...>', 'Additional project directories to auto-index and serve')
   .action(async (options) => {
     await serveCommand({ ...options, noIndex: options.index === false, noWatch: options.watch === false });
+  });
+
+program
+  .command('export')
+  .description('Export knowledge graph as Mermaid or DOT for use in PRs, docs, and diagrams')
+  .option('--format <format>', 'Output format: mermaid or dot (default: mermaid)')
+  .option('--package <name>', 'Filter by package name')
+  .option('--type <types>', 'Filter by node types (comma-separated: Function,Class,Interface)')
+  .option('--symbol <name>', 'Show ego graph around a symbol')
+  .option('--depth <n>', 'Max hops from symbol (default: 2)', parseInt)
+  .option('--edges <types>', 'Filter edge types (comma-separated: CALLS,EXTENDS)')
+  .option('--limit <n>', 'Max nodes to include (default: 50)', parseInt)
+  .option('--direction <dir>', 'Graph direction: TD or LR (default: TD for mermaid, LR for dot)')
+  .option('--repo <name>', 'Use a specific repo index')
+  .action(async (options) => {
+    await exportCommand(options);
   });
 
 program

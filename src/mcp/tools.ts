@@ -367,4 +367,53 @@ AFTER THIS: Use recon_query() or recon_context() to inspect the updated symbols.
       required: [],
     },
   },
+  {
+    name: 'recon_export',
+    description: `Export the knowledge graph as a Mermaid flowchart or Graphviz DOT diagram. Perfect for generating architecture diagrams, PR visualizations, and documentation.
+
+WHEN TO USE: When the user asks for a visual diagram, architecture map, or wants to see the graph structure in a shareable format.
+OUTPUT: Returns Mermaid (pasteable in GitHub Markdown) or DOT (render with graphviz).
+FILTERS: Use package, symbol (ego graph with depth), type, and edges to focus the output.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        format: {
+          type: 'string',
+          description: 'Output format: "mermaid" or "dot" (default: mermaid)',
+          enum: ['mermaid', 'dot'],
+        },
+        package: {
+          type: 'string',
+          description: 'Filter by package name (e.g., "mcp", "search")',
+        },
+        symbol: {
+          type: 'string',
+          description: 'Show ego graph centered on this symbol (e.g., "handleQuery")',
+        },
+        depth: {
+          type: 'number',
+          description: 'Max hops from symbol (default: 2). Only used with symbol.',
+        },
+        type: {
+          type: 'string',
+          description: 'Filter by node types, comma-separated (e.g., "Function,Interface")',
+        },
+        edges: {
+          type: 'string',
+          description: 'Filter by edge types, comma-separated (e.g., "CALLS,EXTENDS")',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max nodes to include (default: 50)',
+        },
+        direction: {
+          type: 'string',
+          description: 'Graph direction: "TD" (top-down) or "LR" (left-right)',
+          enum: ['TD', 'LR'],
+        },
+        repo: REPO_PROPERTY,
+      },
+      required: [],
+    },
+  },
 ];

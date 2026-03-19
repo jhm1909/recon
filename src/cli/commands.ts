@@ -22,6 +22,7 @@ import { initEmbedder, embedBatch, disposeEmbedder, DEFAULT_CONFIG } from '../se
 import { analyzeTreeSitter, analyzeTreeSitterParallel } from '../analyzers/tree-sitter/index.js';
 import { getAvailableLanguages } from '../analyzers/tree-sitter/index.js';
 import { detectCommunities } from '../graph/community.js';
+import { NodeType, RelationshipType } from '../graph/types.js';
 import { ReconWatcher } from '../watcher/watcher.js';
 import type { ProjectDir } from '../watcher/watcher.js';
 import { loadConfig, mergeWithCLI, initConfig } from '../config/config.js';
@@ -624,4 +625,58 @@ export function initCommandFn(): void {
   } else {
     console.log('[recon] .recon.json already exists — skipping.');
   }
+}
+
+
+// ═══ export command ═══════════════════════════════════════════════
+
+export async function exportCommand(options: {
+  format?: string;
+  package?: string;
+  type?: string;
+  symbol?: string;
+  depth?: number;
+  edges?: string;
+  limit?: number;
+  direction?: string;
+  repo?: string;
+}): Promise<void> {
+  const { exportGraph } = await import('../export/exporter.js');
+
+  const projectRoot = findProjectRoot();
+  const repoName = options.repo;
+
+  // Load graph
+  const stored = await loadIndex(projectRoot, repoName);
+  if (!stored) {
+    console.error("[recon] No index found. Run 'npx recon index' first.");
+    process.exit(1);
+  }
+
+  const format = (options.format || 'mermaid') as 'mermaid' | 'dot';
+
+  // Parse type filter
+  const types = options.type
+    ? options.type.split(',').map(t => t.trim() as NodeType).filter(t => Object.values(NodeType).includes(t))
+    : undefined;
+
+  // Parse edge filter
+  const edges = options.edges
+    ? options.edges.split(',').map(e => e.trim() as RelationshipType).filter(e => Object.values(RelationshipType).includes(e))
+    : undefined;
+
+  const output = exportGraph(stored.graph, {
+    format,
+    package: options.package,
+    types,
+    symbol: options.symbol,
+    depth: options.depth,
+    edges,
+    limit: options.limit ?? 50,
+    direction: (options.direction as 'TD' | 'LR') ?? undefined,
+    skipFiles: true,
+  });
+
+  // Output to stdout for piping
+  process.stdout.write(output + '\n');
 }

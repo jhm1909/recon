@@ -104,6 +104,9 @@ export async function handleToolCall(
     case 'recon_watcher_status':
       return formatWatcherStatus();
 
+    case 'recon_export':
+      return handleExport(args, graph);
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -1318,4 +1321,44 @@ function formatWatcherStatus(): string {
   }
 
   return lines.join('\n');
+}
+
+// ─── Export Handler ──────────────────────────────────────────────
+
+function handleExport(
+  args: Record<string, unknown> | undefined,
+  graph: KnowledgeGraph,
+): string {
+  const { exportGraph } = require('../export/exporter.js');
+
+  const format = ((args?.format as string) || 'mermaid') as 'mermaid' | 'dot';
+
+  // Parse type filter
+  const typeStr = args?.type as string | undefined;
+  const types = typeStr
+    ? typeStr.split(',').map(t => t.trim()).filter(t => Object.values(NodeType).includes(t as NodeType)) as NodeType[]
+    : undefined;
+
+  // Parse edge filter
+  const edgeStr = args?.edges as string | undefined;
+  const edges = edgeStr
+    ? edgeStr.split(',').map(e => e.trim()).filter(e => Object.values(RelationshipType).includes(e as RelationshipType)) as RelationshipType[]
+    : undefined;
+
+  graph = maybeFilterByRepo(args, graph);
+
+  const output = exportGraph(graph, {
+    format,
+    package: args?.package as string | undefined,
+    types,
+    symbol: args?.symbol as string | undefined,
+    depth: args?.depth as number | undefined,
+    edges,
+    limit: (args?.limit as number) || 50,
+    direction: args?.direction as 'TD' | 'LR' | undefined,
+    skipFiles: true,
+  });
+
+  const nodeCount = output.split('\n').filter((l: string) => l.includes('[') || l.includes('label=')).length;
+  return `# Export (${format})\n\n\`\`\`${format === 'mermaid' ? 'mermaid' : 'dot'}\n${output}\n\`\`\`\n\n_${nodeCount} nodes rendered._`;
 }
