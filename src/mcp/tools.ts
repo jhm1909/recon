@@ -416,4 +416,38 @@ FILTERS: Use package, symbol (ego graph with depth), type, and edges to focus th
       required: [],
     },
   },
+  {
+    name: 'recon_pr_review',
+    description: `Graph-aware PR review. Analyzes code changes using the dependency graph to assess blast radius, risk level, affected execution flows, and review priorities.
+
+Unlike text-based review (Copilot), this uses structural analysis — it knows which functions call the changed code, which execution flows break, and which communities are affected.
+
+OUTPUT: Markdown report with per-file risk (🔴🟡🟢), affected symbols, execution flows, architecture diagram, and review priorities.
+
+WHEN TO USE: Before merging a PR, after making significant changes, or when the user asks "what did I break?" or "is this safe to merge?"`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scope: {
+          type: 'string',
+          description: 'Diff scope: "staged", "unstaged", "branch", "all" (default: all)',
+          enum: ['staged', 'unstaged', 'branch', 'all'],
+        },
+        base: {
+          type: 'string',
+          description: 'Base branch for branch diff (default: main)',
+        },
+        include_diagram: {
+          type: 'boolean',
+          description: 'Include Mermaid architecture diagram (default: true)',
+        },
+        include_tests: {
+          type: 'boolean',
+          description: 'Include test files in analysis (default: false)',
+        },
+        repo: REPO_PROPERTY,
+      },
+      required: [],
+    },
+  },
 ];

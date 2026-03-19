@@ -107,6 +107,9 @@ export async function handleToolCall(
     case 'recon_export':
       return handleExport(args, graph);
 
+    case 'recon_pr_review':
+      return handlePRReview(args, graph);
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -1361,4 +1364,27 @@ function handleExport(
 
   const nodeCount = output.split('\n').filter((l: string) => l.includes('[') || l.includes('label=')).length;
   return `# Export (${format})\n\n\`\`\`${format === 'mermaid' ? 'mermaid' : 'dot'}\n${output}\n\`\`\`\n\n_${nodeCount} nodes rendered._`;
+}
+
+// ─── PR Review Handler ──────────────────────────────────────────
+
+function handlePRReview(
+  args: Record<string, unknown> | undefined,
+  graph: KnowledgeGraph,
+): string {
+  const { analyzeChanges, formatReview } = require('../review/reviewer.js');
+
+  graph = maybeFilterByRepo(args, graph);
+
+  const projectRoot = findProjectRoot();
+
+  const options = {
+    scope: (args?.scope as string) || 'all',
+    base: (args?.base as string) || 'main',
+    includeDiagram: (args?.include_diagram as boolean) ?? true,
+    includeTests: (args?.include_tests as boolean) ?? false,
+  };
+
+  const result = analyzeChanges(graph, projectRoot, options);
+  return formatReview(result, graph, options);
 }

@@ -8,7 +8,7 @@
  */
 
 import { Command } from 'commander';
-import { indexCommand, serveCommand, statusCommand, cleanCommand, initCommandFn, exportCommand } from './commands.js';
+import { indexCommand, serveCommand, statusCommand, cleanCommand, initCommandFn, exportCommand, reviewCommand } from './commands.js';
 
 const program = new Command();
 
@@ -54,6 +54,18 @@ program
   .option('--repo <name>', 'Use a specific repo index')
   .action(async (options) => {
     await exportCommand(options);
+  });
+
+program
+  .command('review')
+  .description('Graph-aware PR review — blast radius, risk, affected flows')
+  .option('--scope <scope>', 'Diff scope: staged, unstaged, branch, all (default: all)')
+  .option('--base <branch>', 'Base branch for branch diff (default: main)')
+  .option('--no-diagram', 'Skip Mermaid architecture diagram')
+  .option('--tests', 'Include test files in analysis')
+  .option('--repo <name>', 'Use a specific repo index')
+  .action(async (options) => {
+    await reviewCommand({ ...options, diagram: options.diagram !== false });
   });
 
 program

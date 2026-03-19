@@ -680,3 +680,38 @@ export async function exportCommand(options: {
   // Output to stdout for piping
   process.stdout.write(output + '\n');
 }
+
+
+// ═══ review command ═══════════════════════════════════════════════
+
+export async function reviewCommand(options: {
+  scope?: string;
+  base?: string;
+  diagram?: boolean;
+  tests?: boolean;
+  repo?: string;
+}): Promise<void> {
+  const { analyzeChanges, formatReview } = await import('../review/reviewer.js');
+
+  const projectRoot = findProjectRoot();
+  const repoName = options.repo;
+
+  // Load graph
+  const stored = await loadIndex(projectRoot, repoName);
+  if (!stored) {
+    console.error("[recon] No index found. Run 'npx recon index' first.");
+    process.exit(1);
+  }
+
+  const reviewOptions = {
+    scope: (options.scope || 'all') as 'staged' | 'unstaged' | 'branch' | 'all',
+    base: options.base || 'main',
+    includeDiagram: options.diagram ?? true,
+    includeTests: options.tests ?? false,
+  };
+
+  const result = analyzeChanges(stored.graph, projectRoot, reviewOptions);
+  const report = formatReview(result, stored.graph, reviewOptions);
+
+  process.stdout.write(report + '\n');
+}
