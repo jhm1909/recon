@@ -107,14 +107,19 @@ export function analyzeTreeSitter(
   }
 
   const sourceFiles = findSourceFiles(rootDir);
-  const extractions = new Map<string, FileExtractionResult>();
   const fileHashes: Record<string, string> = {};
   const languageCounts: Record<string, number> = {};
   let skipped = 0;
-  let totalCalls = 0;
+
+  // Read files and filter unchanged ones (incremental)
+  interface FileToProcess {
+    relativePath: string;
+    content: string;
+    language: Language;
+  }
+  const filesToProcess: FileToProcess[] = [];
 
   for (const file of sourceFiles) {
-    // Read file content
     let content: string;
     try {
       content = readFileSync(file.absolutePath, 'utf-8');
@@ -122,7 +127,6 @@ export function analyzeTreeSitter(
       continue;
     }
 
-    // Incremental: skip unchanged files
     const hash = hashContent(content);
     fileHashes[file.relativePath] = hash;
 
@@ -131,10 +135,20 @@ export function analyzeTreeSitter(
       continue;
     }
 
-    // Extract
-    const result = extractFromFile(file.relativePath, content, file.language);
-    extractions.set(file.relativePath, result);
+    filesToProcess.push({
+      relativePath: file.relativePath,
+      content,
+      language: file.language,
+    });
+  }
 
+  // Extract symbols — sequential (always works)
+  const extractions = new Map<string, FileExtractionResult>();
+  let totalCalls = 0;
+
+  for (const file of filesToProcess) {
+    const result = extractFromFile(file.relativePath, file.content, file.language);
+    extractions.set(file.relativePath, result);
     totalCalls += result.calls.length;
 
     const langKey = file.language;
@@ -156,3 +170,132 @@ export function analyzeTreeSitter(
     fileHashes,
   };
 }
+
+/**
+ * Async version that uses worker pool for large codebases.
+ * Falls back to sequential analyzeTreeSitter if pool fails.
+ *
+ * @param rootDir - Project root directory
+ * @param previousHashes - Optional file hashes for incremental mode
+ */
+export async function analyzeTreeSitterParallel(
+  rootDir: string,
+  previousHashes?: Record<string, string>,
+): Promise<TreeSitterAnalysisResult> {
+  const available = getAvailableLanguages();
+  if (available.length === 0) {
+    return {
+      result: { nodes: [], relationships: [] },
+      stats: { files: 0, symbols: 0, calls: 0, skipped: 0, languages: {} },
+      fileHashes: {},
+    };
+  }
+
+  const sourceFiles = findSourceFiles(rootDir);
+  const fileHashes: Record<string, string> = {};
+  const languageCounts: Record<string, number> = {};
+  let skipped = 0;
+
+  // Read files and filter unchanged
+  interface FileToProcess {
+    relativePath: string;
+    content: string;
+    language: Language;
+  }
+  const filesToProcess: FileToProcess[] = [];
+
+  for (const file of sourceFiles) {
+    let content: string;
+    try {
+      content = readFileSync(file.absolutePath, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    const hash = hashContent(content);
+    fileHashes[file.relativePath] = hash;
+
+    if (previousHashes && previousHashes[file.relativePath] === hash) {
+      skipped++;
+      continue;
+    }
+
+    filesToProcess.push({
+      relativePath: file.relativePath,
+      content,
+      language: file.language,
+    });
+  }
+
+  // Below threshold → use sequential path
+  const { WORKER_THRESHOLD, TreeSitterPool } = await import('./pool.js');
+  if (filesToProcess.length < WORKER_THRESHOLD) {
+    return analyzeTreeSitter(rootDir, previousHashes);
+  }
+
+  // Try parallel parsing with worker pool
+  const pool = new TreeSitterPool();
+  const poolStarted = pool.spawn();
+
+  if (!poolStarted) {
+    console.error('[recon] Worker pool unavailable, using sequential parser.');
+    pool.terminate();
+    return analyzeTreeSitter(rootDir, previousHashes);
+  }
+
+  console.error(`[recon] Worker pool started: ${pool.poolSize} threads for ${filesToProcess.length} files`);
+  const parseStart = performance.now();
+
+  try {
+    const tasks = filesToProcess.map(f => ({
+      filePath: f.relativePath,
+      content: f.content,
+      language: f.language,
+    }));
+
+    const parseResults = await pool.parseFiles(tasks);
+
+    const extractions = new Map<string, FileExtractionResult>();
+    let totalCalls = 0;
+    let errors = 0;
+
+    for (const [filePath, pr] of parseResults) {
+      if (pr.error) {
+        errors++;
+        continue;
+      }
+      extractions.set(filePath, pr.result);
+      totalCalls += pr.result.calls.length;
+
+      // Count languages
+      const file = filesToProcess.find(f => f.relativePath === filePath);
+      if (file) {
+        languageCounts[file.language] = (languageCounts[file.language] || 0) + 1;
+      }
+    }
+
+    const parseElapsed = Math.round(performance.now() - parseStart);
+    console.error(`[recon] Worker pool: parsed ${extractions.size} files in ${parseElapsed}ms (${errors} errors)`);
+
+    // Build graph from extractions
+    const graphResult = buildGraphFromExtractions(extractions);
+
+    return {
+      result: graphResult,
+      stats: {
+        files: extractions.size,
+        symbols: graphResult.nodes.length,
+        calls: totalCalls,
+        skipped,
+        languages: languageCounts,
+      },
+      fileHashes,
+    };
+  } catch (err) {
+    console.error(`[recon] Worker pool error: ${err}. Falling back to sequential.`);
+    return analyzeTreeSitter(rootDir, previousHashes);
+  } finally {
+    pool.terminate();
+  }
+}
+

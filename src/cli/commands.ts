@@ -19,7 +19,7 @@ import { BM25Index } from '../search/bm25.js';
 import { VectorStore } from '../search/vector-store.js';
 import { generateEmbeddingText, isEmbeddable } from '../search/text-generator.js';
 import { initEmbedder, embedBatch, disposeEmbedder, DEFAULT_CONFIG } from '../search/embedder.js';
-import { analyzeTreeSitter } from '../analyzers/tree-sitter/index.js';
+import { analyzeTreeSitter, analyzeTreeSitterParallel } from '../analyzers/tree-sitter/index.js';
 import { getAvailableLanguages } from '../analyzers/tree-sitter/index.js';
 import { detectCommunities } from '../graph/community.js';
 import { ReconWatcher } from '../watcher/watcher.js';
@@ -262,7 +262,7 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
   let tsitterHashes: Record<string, string> = {};
   if (tsitterLangs.length > 0) {
     console.log(`[recon] Analyzing with tree-sitter (${tsitterLangs.join(', ')})...`);
-    const tsitterResult = analyzeTreeSitter(projectRoot, previousHashes);
+    const tsitterResult = await analyzeTreeSitterParallel(projectRoot, previousHashes);
 
     for (const node of tsitterResult.result.nodes) {
       graph.addNode(node);
