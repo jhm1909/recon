@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Graph Export** — `recon export` CLI + `recon_export` MCP tool (Mermaid/DOT, package/symbol/type/edge filters, subgraph clustering)
+- **PR Review** — `recon review` CLI + `recon_pr_review` MCP tool (graph-aware blast radius, per-file risk 🔴🟡🟢, affected execution flows, Mermaid diagram, review priorities)
+- **Auto-detect semantic search** — if `@huggingface/transformers` is installed, embeddings are generated automatically during `recon index`
+- **Embedder pre-init on serve** — background embedder initialization for query-time hybrid search
+
 ## [5.3.0] - 2026-03-19
 
 ### Added

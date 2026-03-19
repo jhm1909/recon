@@ -33,7 +33,7 @@
 
 AI coding agents are **blind to architecture**. They grep, they guess, they break things.
 
-Recon fixes this by indexing your codebase into a **knowledge graph** — functions, classes, call chains, imports, communities — and exposing it through **12 MCP tools**, **3 prompts**, and **5 resources** that any AI agent can query.
+Recon fixes this by indexing your codebase into a **knowledge graph** — functions, classes, call chains, imports, communities — and exposing it through **14 MCP tools**, **3 prompts**, and **5 resources** that any AI agent can query.
 
 > 💡 **One command, full awareness.** Your agent gets dependency mapping, blast radius analysis, safe renames, execution flow tracing, Cypher queries, and hybrid semantic search — without reading every file.
 
@@ -330,6 +330,14 @@ recon serve --no-index             # Skip auto-indexing and file watcher
 recon serve --no-watch             # Auto-index but disable file watcher
 recon serve --repo my-backend      # Serve specific repo only
 
+recon export                       # Export graph as Mermaid flowchart
+recon export --format dot          # Export as Graphviz DOT
+recon export --symbol handleQuery  # Ego graph around a symbol
+
+recon review                       # PR review — blast radius + risk
+recon review --scope branch        # Review branch diff vs main
+recon review --scope staged        # Review staged changes only
+
 recon status                       # Show index stats
 recon status --repo my-backend     # Status for specific repo
 recon clean                        # Delete index
@@ -381,7 +389,7 @@ With a config file, your MCP setup stays minimal:
 
 ## Tool Reference
 
-All 12 tools accept an optional `repo` parameter for multi-repo filtering.
+All 14 tools accept an optional `repo` parameter for multi-repo filtering.
 
 ### recon_packages
 
@@ -482,6 +490,24 @@ Get the live status of the file watcher — active state, watched directories, u
 ```
 recon_watcher_status()
 ```
+
+### recon_export
+
+Export the knowledge graph as a Mermaid flowchart or Graphviz DOT diagram. Filterable by package, symbol, node type, and edge type.
+
+```
+recon_export(format?: "mermaid" | "dot", package?: string, symbol?: string, depth?: number, type?: string, edges?: string, limit?: number)
+```
+
+### recon_pr_review
+
+Graph-aware PR review — analyzes code changes using the dependency graph to assess blast radius, risk, affected execution flows, and review priorities.
+
+```
+recon_pr_review(scope?: "staged" | "unstaged" | "branch" | "all", base?: string, include_diagram?: boolean)
+```
+
+**Risk levels:** `LOW` · `MEDIUM` · `HIGH` · `CRITICAL` — scored by direct callers, confidence tiers, and cross-community impact.
 
 ---
 
