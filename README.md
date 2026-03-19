@@ -79,6 +79,7 @@ recon index && recon serve
 - **Graph-aware rename** — safe multi-file renames
 - **Execution flow tracing** — BFS from entry points through call chains
 - **Cross-language tracing** — follow API calls across Go ↔ TypeScript
+- **PR Review** — graph-aware blast radius, risk assessment, affected flows
 
 </td>
 <td width="50%">
@@ -151,6 +152,23 @@ recon export --format dot | dot -Tsvg > architecture.svg
 
 Also available as MCP tool `recon_export` — agents can generate diagrams directly in conversation.
 
+## PR Review
+
+Graph-aware code review — know what breaks **before** you merge:
+
+```bash
+# Review all uncommitted changes
+recon review
+
+# Review current branch vs main
+recon review --scope branch --base main
+
+# Review only staged changes
+recon review --scope staged
+```
+
+Output includes: per-file risk (🔴🟡🟢), blast radius, affected execution flows, architecture diagram, and review priorities. Also available as MCP tool `recon_pr_review`.
+
 ## How It Works
 
 ```
@@ -164,7 +182,7 @@ When your AI agent starts:
 3. Recon **auto-indexes** the project (`cwd`) → creates `.recon/` folder
 4. **File watcher** starts → monitors source files for changes
 5. MCP server opens on **stdio** (stdin/stdout) — no network, no port
-6. Agent sees 13 tools + 3 prompts + 5 resources
+6. Agent sees 14 tools + 3 prompts + 5 resources
 7. Agent receives built-in instructions → knows when to use each tool
 8. You edit code → graph updates surgically in ~50ms → auto-saved to disk → agent always has fresh data
 
