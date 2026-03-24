@@ -37,6 +37,10 @@ Recon fixes this by indexing your codebase into a **knowledge graph** — functi
 
 > 💡 **One command, full awareness.** Your agent gets dependency mapping, blast radius analysis, safe renames, execution flow tracing, Cypher queries, and hybrid semantic search — without reading every file.
 
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/1da53db2-c97d-4a0d-8282-2ef40ad6c5ba" width="100%" autoplay loop muted playsinline></video>
+</p>
+
 ---
 
 ## Quick Start
