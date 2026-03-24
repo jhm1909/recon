@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Recon is a lightweight code intelligence engine that builds a knowledge graph of Go + TypeScript codebases and exposes it via MCP (Model Context Protocol). It provides 6 tools: `recon_packages`, `recon_query`, `recon_context`, `recon_impact`, `recon_detect_changes`, `recon_api_map`.
+Recon is a lightweight code intelligence engine that builds a knowledge graph of codebases (13 languages via tree-sitter + TypeScript Compiler API) and exposes it via MCP (Model Context Protocol). It provides 14 tools, 3 prompts, and 5 resources for dependency mapping, blast radius analysis, safe rename, execution flow tracing, and graph queries.
 
 ## Build & Run
 

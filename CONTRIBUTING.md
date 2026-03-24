@@ -48,17 +48,24 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ## Project Structure
 
-- `src/analyzers/` — Language-specific code analysis (Go, TypeScript, cross-language)
-- `src/graph/` — Knowledge graph data structure and types
-- `src/mcp/` — MCP server, tool definitions, and handlers
+- `src/analyzers/` — Language-specific code analysis (TypeScript Compiler API, tree-sitter for 13 languages, cross-language)
+- `src/graph/` — Knowledge graph, community detection, execution flow tracing
+- `src/mcp/` — MCP server, 14 tool definitions, handlers, prompts, resources
+- `src/search/` — BM25 search index, hybrid semantic search, vector store
+- `src/query/` — Cypher-like query parser and executor
+- `src/watcher/` — Live file watcher with surgical graph updates
+- `src/export/` — Mermaid/DOT graph export
+- `src/review/` — Graph-aware PR review
+- `src/server/` — HTTP REST API + dashboard serving
 - `src/storage/` — Index persistence (JSON file I/O)
-- `src/cli/` — CLI commands (index, serve, status, clean)
+- `src/cli/` — CLI commands (index, serve, status, clean, export, review)
+- `src/dashboard/` — Interactive web dashboard (HTML/CSS/JS)
 
 ## Code Style
 
 - TypeScript strict mode
 - ES modules (`"type": "module"`)
-- No external test framework yet — contributions welcome
+- Uses **vitest** for testing — run `npm test` (459 tests across 17 suites)
 
 ## Reporting Issues
 

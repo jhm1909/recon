@@ -609,7 +609,7 @@ Enable with `recon index --embeddings`, then use `recon_query({query: "...", sem
 │   │   └── watcher.ts            # Live file watcher — surgical graph updates
 │   ├── mcp/
 │   │   ├── server.ts             # MCP server (stdio transport)
-│   │   ├── tools.ts              # 12 tool definitions (JSON Schema)
+│   │   ├── tools.ts              # 14 tool definitions (JSON Schema)
 │   │   ├── handlers.ts           # Tool dispatch + query logic
 │   │   ├── prompts.ts            # 3 MCP prompt templates
 │   │   ├── hints.ts              # Next-step hints for agent guidance
@@ -654,7 +654,7 @@ Enable with `recon index --embeddings`, then use `recon_query({query: "...", sem
                                 ┌─────────┴──────────┐
                            MCP Server (stdio)   HTTP REST API
                          ┌───┴────┐────┐        (:3100 + Dashboard)
-                     12 Tools  3 Prompts  5 Resources
+                     14 Tools  3 Prompts  5 Resources
                          │        │      recon://packages
                    ┌─────┼────┐   │      recon://symbol/{name}
                    │     │    │   │      recon://file/{path}
@@ -737,7 +737,7 @@ npm test           # Run all tests
 npx vitest --watch # Watch mode
 ```
 
-**410 tests** across **14 test suites:**
+**459 tests** across **17 test suites:**
 
 | Suite | Tests | Coverage |
 |-------|-------|----------|

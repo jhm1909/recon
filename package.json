@@ -10,7 +10,6 @@
   "files": [
     "bin/",
     "dist/",
-    "analyzer/",
     "README.md",
     "LICENSE"
   ],
