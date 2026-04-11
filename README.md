@@ -5,8 +5,8 @@
 <h1 align="center">Recon</h1>
 
 <p align="center">
-  <strong>Code intelligence engine for AI agents</strong><br/>
-  Knowledge graph · 13 languages · Live re-index · MCP + REST · Interactive dashboard
+  <strong>Give your AI agent a brain. Index your codebase in 5 seconds.</strong><br/>
+  <sub>A code intelligence MCP server — 14 tools, 13 languages, knowledge graph, zero config.</sub>
 </p>
 
 <p align="center">
@@ -18,28 +18,52 @@
 </p>
 
 <p align="center">
+  <a href="#tldr">TL;DR</a> ·
   <a href="#quick-start">Quick Start</a> ·
   <a href="#features">Features</a> ·
-  <a href="#configuration">Config</a> ·
   <a href="#mcp-integration">MCP Setup</a> ·
   <a href="#tool-reference">Tools</a> ·
-  <a href="#dashboard">Dashboard</a> ·
-  <a href="#mcp-prompts">Prompts</a>
+  <a href="#dashboard">Dashboard</a>
+</p>
+
+---
+
+## TL;DR
+
+**Your AI agent is blind to architecture.** It greps, it guesses, it breaks things in files it never read.
+
+Recon fixes this in one line:
+
+```bash
+npx recon-mcp serve
+```
+
+That's it. Your agent now has a knowledge graph of your entire codebase:
+
+- **Ask "what breaks if I change this function?"** — blast radius in ms
+- **"Trace execution flow from this API route"** — cross-language call chain
+- **"Find code structurally similar to X"** — hybrid BM25 + vector search
+- **"Safely rename this across the repo"** — graph-aware, no false positives
+- **"Draw me an architecture diagram"** — Mermaid or Graphviz, one command
+- **"Review this PR"** — blast radius + risk per file before you merge
+
+Works with **Claude Code, Cursor, Windsurf** and any MCP client. **Zero config.** **13 languages.** **MIT.**
+
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/1da53db2-c97d-4a0d-8282-2ef40ad6c5ba" width="100%" autoplay loop muted playsinline></video>
 </p>
 
 ---
 
 ## Why Recon?
 
-AI coding agents are **blind to architecture**. They grep, they guess, they break things.
+AI coding agents are **blind to architecture**. They read one file at a time, grep for identifiers, guess at call sites, and break things in places they never saw.
 
-Recon fixes this by indexing your codebase into a **knowledge graph** — functions, classes, call chains, imports, communities — and exposing it through **14 MCP tools**, **3 prompts**, and **5 resources** that any AI agent can query.
+You can't fix this with a bigger context window. You need **structure**.
 
-> 💡 **One command, full awareness.** Your agent gets dependency mapping, blast radius analysis, safe renames, execution flow tracing, Cypher queries, and hybrid semantic search — without reading every file.
+Recon indexes your codebase into a **knowledge graph** — functions, classes, call chains, imports, communities — and exposes it through **14 MCP tools**, **3 prompts**, and **5 resources** that any AI agent can query.
 
-<p align="center">
-  <video src="https://github.com/user-attachments/assets/1da53db2-c97d-4a0d-8282-2ef40ad6c5ba" width="100%" autoplay loop muted playsinline></video>
-</p>
+> **One command, full awareness.** Your agent gets dependency mapping, blast radius analysis, safe renames, execution flow tracing, Cypher queries, and hybrid semantic search — without reading every file.
 
 ---
 
@@ -75,7 +99,7 @@ recon index && recon serve
 <tr>
 <td width="50%">
 
-### 🔍 Code Intelligence
+### Code Intelligence
 - **13 languages** via tree-sitter + dedicated analyzers
 - **Multi-repo** indexing and cross-repo queries
 - **Community detection** — automatic module clustering (label propagation)
@@ -88,7 +112,7 @@ recon index && recon serve
 </td>
 <td width="50%">
 
-### ⚡ Search & Query
+### Search & Query
 - **BM25 search** — camelCase/snake_case tokenization with relevance ranking
 - **Hybrid semantic search** — vector embeddings (all-MiniLM-L6-v2) + RRF fusion
 - **Cypher-like queries** — `MATCH`/`WHERE`/`RETURN` structural queries
@@ -171,7 +195,7 @@ recon review --scope branch --base main
 recon review --scope staged
 ```
 
-Output includes: per-file risk (🔴🟡🟢), blast radius, affected execution flows, architecture diagram, and review priorities. Also available as MCP tool `recon_pr_review`.
+Output includes: per-file risk (LOW/MED/HIGH), blast radius, affected execution flows, architecture diagram, and review priorities. Also available as MCP tool `recon_pr_review`.
 
 ## How It Works
 
@@ -552,12 +576,12 @@ recon serve --http  # → http://localhost:3100
 ```
 
 **Features:**
-- 🔹 **Graph Tab** — Force-directed knowledge graph with type-colored nodes, community coloring toggle, and click-to-inspect
-- 🔹 **Processes Tab** — Execution flow viewer with call chains, branch counts, and community tags
-- 🔹 **Impact Tab** — Interactive blast radius analysis with risk levels and confidence tiers
-- 🔹 **Live Search** — Debounced search dropdown (200ms) with keyboard navigation (↑↓ Enter Esc)
-- 🔹 **Graph Legend** — Node type → shape/color mapping
-- 🔹 **Package Sidebar** — Filter graph by package with symbol counts
+- **Graph Tab** — Force-directed knowledge graph with type-colored nodes, community coloring toggle, and click-to-inspect
+- **Processes Tab** — Execution flow viewer with call chains, branch counts, and community tags
+- **Impact Tab** — Interactive blast radius analysis with risk levels and confidence tiers
+- **Live Search** — Debounced search dropdown (200ms) with keyboard navigation (↑↓ Enter Esc)
+- **Graph Legend** — Node type → shape/color mapping
+- **Package Sidebar** — Filter graph by package with symbol counts
 
 ---
 
