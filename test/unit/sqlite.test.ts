@@ -401,6 +401,63 @@ describe('SqliteStore', () => {
     expect(store.relationshipCount).toBe(0);
   });
 
+  // ─── Structural queries ──────────────────────────────────────
+
+  describe('structural queries', () => {
+    it('findDeadCode returns exported nodes with zero incoming calls', () => {
+      // Insert nodes
+      store.insertNode(makeNode('ts:func:used', 'usedFunc', { exported: true }));
+      store.insertNode(makeNode('ts:func:unused', 'unusedFunc', { exported: true }));
+      store.insertNode(makeNode('ts:func:caller', 'caller', { exported: true }));
+      // Only 'used' has an incoming CALLS edge
+      store.insertRelationship(makeRel('ts:func:caller', 'ts:func:used'));
+
+      const dead = store.findDeadCode();
+      const names = dead.map(n => n.name);
+      expect(names).toContain('unusedFunc');
+      expect(names).toContain('caller'); // caller has no one calling IT
+      expect(names).not.toContain('usedFunc');
+    });
+
+    it('findOrphans returns nodes with no relationships', () => {
+      store.insertNode(makeNode('ts:func:orphan', 'orphanFunc', { file: 'src/orphan.ts' }));
+      store.insertNode(makeNode('ts:func:connected', 'connectedFunc', { file: 'src/connected.ts' }));
+      store.insertNode(makeNode('ts:func:other', 'otherFunc', { file: 'src/other.ts' }));
+      store.insertRelationship(makeRel('ts:func:connected', 'ts:func:other'));
+
+      const orphans = store.findOrphans();
+      const names = orphans.map(n => n.name);
+      expect(names).toContain('orphanFunc');
+      expect(names).not.toContain('connectedFunc');
+      expect(names).not.toContain('otherFunc');
+    });
+
+    it('findLargeFiles returns files exceeding threshold', () => {
+      for (let i = 0; i < 35; i++) {
+        store.insertNode(makeNode(`ts:func:f${i}`, `func${i}`, { file: 'src/big.ts' }));
+      }
+      store.insertNode(makeNode('ts:func:small', 'small', { file: 'src/small.ts' }));
+
+      const large = store.findLargeFiles(30);
+      expect(large).toHaveLength(1);
+      expect(large[0].file).toBe('src/big.ts');
+      expect(large[0].count).toBe(35);
+    });
+
+    it('findUnusedExports returns exported nodes with no incoming usage', () => {
+      store.insertNode(makeNode('ts:func:unused', 'unusedExport', { exported: true, file: 'src/a.ts' }));
+      store.insertNode(makeNode('ts:func:used', 'usedExport', { exported: true, file: 'src/b.ts' }));
+      store.insertNode(makeNode('ts:func:caller', 'callerFunc', { file: 'src/c.ts' }));
+      // usedExport has an incoming CALLS edge
+      store.insertRelationship(makeRel('ts:func:caller', 'ts:func:used'));
+
+      const unused = store.findUnusedExports();
+      const names = unused.map(n => n.name);
+      expect(names).toContain('unusedExport');
+      expect(names).not.toContain('usedExport');
+    });
+  });
+
   // ─── close ───────────────────────────────────────────────────
 
   it('close() is idempotent', () => {

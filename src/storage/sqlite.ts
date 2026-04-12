@@ -646,12 +646,12 @@ export class SqliteStore {
 
   /**
    * Tokenize an identifier for FTS indexing.
-   * Splits camelCase and snake_case into separate tokens.
+   * Splits camelCase and snake_case into individual tokens (no compound tokens).
    *
    * Examples:
-   *   "getUserProfile"   -> "get user profile getuser profile"
+   *   "getUserProfile"   -> "get user profile"
    *   "get_user_profile" -> "get user profile"
-   *   "HTTPClient"       -> "http client httpclient"
+   *   "HTTPClient"       -> "http client"
    */
   private _tokenizeForSearch(input: string): string {
     if (!input) return '';
