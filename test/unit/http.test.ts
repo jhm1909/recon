@@ -240,9 +240,19 @@ describe('GET /api/resources/read?uri=...', () => {
 // ─── CORS ───────────────────────────────────────────────────────
 
 describe('CORS', () => {
-  it('includes CORS headers', async () => {
-    const res = await request(app).get('/api/health');
+  it('includes CORS headers for localhost origin', async () => {
+    const res = await request(app)
+      .get('/api/health')
+      .set('Origin', 'http://localhost:3000');
 
     expect(res.headers['access-control-allow-origin']).toBeDefined();
+  });
+
+  it('does not include CORS headers for disallowed origin', async () => {
+    const res = await request(app)
+      .get('/api/health')
+      .set('Origin', 'https://evil.example.com');
+
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
   });
 });

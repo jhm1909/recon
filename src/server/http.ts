@@ -33,6 +33,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export interface HttpServerOptions {
   port: number;
+  host?: string;
   graph: KnowledgeGraph;
   projectRoot?: string;
   vectorStore?: VectorStore | null;
@@ -45,7 +46,9 @@ export function createApp(options: HttpServerOptions): express.Express {
   const { graph, projectRoot, vectorStore } = options;
   const app = express();
 
-  app.use(cors());
+  app.use(cors({
+    origin: [/^https?:\/\/localhost(:\d+)?$/, /^https?:\/\/127\.0\.0\.1(:\d+)?$/],
+  }));
   app.use(express.json());
 
   // ─── Static dashboard ───────────────────────────────────────
@@ -222,12 +225,14 @@ export function createApp(options: HttpServerOptions): express.Express {
 export async function startHttpServer(options: HttpServerOptions): Promise<void> {
   const app = createApp(options);
   const { port } = options;
+  const host = options.host ?? '127.0.0.1';
 
   return new Promise((resolve) => {
-    app.listen(port, () => {
-      console.error(`[recon] HTTP server listening on http://localhost:${port}`);
-      console.error(`[recon] Dashboard: http://localhost:${port}/`);
-      console.error(`[recon] API:       http://localhost:${port}/api/health`);
+    app.listen(port, host, () => {
+      console.log(`Recon HTTP server: http://${host}:${port}`);
+      if (host === '0.0.0.0') {
+        console.log('WARNING: Exposing Recon on all interfaces.');
+      }
       resolve();
     });
   });
