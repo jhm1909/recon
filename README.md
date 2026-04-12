@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="https://em-content.zobj.net/source/apple/391/microscope_1f52c.png" width="80" />
-</p>
 
 <h1 align="center">Recon</h1>
 
