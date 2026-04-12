@@ -18,7 +18,7 @@ import type { RenameResult } from './rename.js';
 import { executeQuery as executeCypherQuery, formatResultAsMarkdown } from '../query/index.js';
 import { listRepos } from '../storage/store.js';
 import { detectProcesses, type Process } from '../graph/process.js';
-import { augment } from './augmentation.js';
+
 import { watcherStatus } from '../watcher/watcher.js';
 
 /**
@@ -97,9 +97,6 @@ export async function handleToolCall(
 
     case 'recon_processes':
       return handleProcesses(args, graph);
-
-    case 'recon_augment':
-      return handleAugment(args, graph);
 
     case 'recon_watcher_status':
       return formatWatcherStatus();
@@ -1268,25 +1265,6 @@ function handleProcesses(
   return lines.join('\n');
 }
 
-// ─── recon_augment ──────────────────────────────────────────────
-
-function handleAugment(
-  args: Record<string, unknown> | undefined,
-  graph: KnowledgeGraph,
-): string {
-  const pattern = args?.pattern as string;
-  if (!pattern) throw new Error("'pattern' is required.");
-
-  graph = maybeFilterByRepo(args, graph);
-
-  const result = augment(pattern, graph);
-  if (!result) {
-    return `No graph context found for "${pattern}". Try recon_query({query: "${pattern}"}) for text search.`;
-  }
-
-  return result;
-}
-
 // ─── recon_watcher_status ─────────────────────────────────────────
 
 function formatWatcherStatus(): string {
@@ -1334,7 +1312,7 @@ function handleExport(
 ): string {
   const { exportGraph } = require('../export/exporter.js');
 
-  const format = ((args?.format as string) || 'mermaid') as 'mermaid' | 'dot';
+  const format = 'mermaid' as const;
 
   // Parse type filter
   const typeStr = args?.type as string | undefined;
@@ -1363,7 +1341,7 @@ function handleExport(
   });
 
   const nodeCount = output.split('\n').filter((l: string) => l.includes('[') || l.includes('label=')).length;
-  return `# Export (${format})\n\n\`\`\`${format === 'mermaid' ? 'mermaid' : 'dot'}\n${output}\n\`\`\`\n\n_${nodeCount} nodes rendered._`;
+  return `# Export (mermaid)\n\n\`\`\`mermaid\n${output}\n\`\`\`\n\n_${nodeCount} nodes rendered._`;
 }
 
 // ─── PR Review Handler ──────────────────────────────────────────

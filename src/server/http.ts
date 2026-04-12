@@ -22,7 +22,7 @@ import type { KnowledgeGraph } from '../graph/graph.js';
 import type { VectorStore } from '../search/vector-store.js';
 import { RECON_TOOLS } from '../mcp/tools.js';
 import { handleToolCall } from '../mcp/handlers.js';
-import { getNextStepHint } from '../mcp/hints.js';
+
 import {
   getResourceDefinitions,
   getResourceTemplates,
@@ -92,9 +92,7 @@ export function createApp(options: HttpServerOptions): express.Express {
         projectRoot,
         vectorStore,
       );
-      const hint = getNextStepHint(name, args as Record<string, unknown>);
-
-      res.json({ result: result + hint });
+      res.json({ result });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       res.status(400).json({ error: message });

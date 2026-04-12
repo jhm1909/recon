@@ -519,18 +519,6 @@ export async function serveCommand(options?: { repo?: string; http?: boolean; po
     }
   }
 
-  // Staleness check
-  try {
-    const { checkStaleness } = await import('../mcp/staleness.js');
-    const stored = await loadIndex(projectRoot, repoName);
-    if (stored?.meta?.gitCommit) {
-      const staleness = checkStaleness(projectRoot, stored.meta.gitCommit);
-      if (staleness.isStale) {
-        console.error(`[recon] ${staleness.hint}`);
-      }
-    }
-  } catch { /* ignore staleness errors */ }
-
   // Start file watcher for live re-indexing
   if (config.watch) {
     const watchDirs: ProjectDir[] = [
@@ -653,7 +641,7 @@ export async function exportCommand(options: {
     process.exit(1);
   }
 
-  const format = (options.format || 'mermaid') as 'mermaid' | 'dot';
+  const format = 'mermaid' as const;
 
   // Parse type filter
   const types = options.type

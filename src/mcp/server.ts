@@ -19,7 +19,7 @@ import { KnowledgeGraph } from '../graph/graph.js';
 import type { VectorStore } from '../search/vector-store.js';
 import { RECON_TOOLS } from './tools.js';
 import { handleToolCall } from './handlers.js';
-import { getNextStepHint } from './hints.js';
+
 import { RECON_INSTRUCTIONS } from './instructions.js';
 import {
   getResourceDefinitions,
@@ -111,10 +111,8 @@ export function createServer(
         projectRoot,
         vectorStore,
       );
-      const hint = getNextStepHint(name, args as Record<string, unknown>);
-
       return {
-        content: [{ type: 'text', text: result + hint }],
+        content: [{ type: 'text', text: result }],
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

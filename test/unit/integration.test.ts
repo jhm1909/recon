@@ -179,13 +179,13 @@ describe('Integration: Full Pipeline', () => {
     expect(output).toContain('subgraph');
   });
 
-  it('graph → export → dot output valid', () => {
+  it('graph → export → mermaid is always the format', () => {
     const graph = buildRealisticGraph();
-    const output = exportGraph(graph, { format: 'dot' });
+    const output = exportGraph(graph, { format: 'mermaid' });
 
-    expect(output).toContain('digraph recon');
+    expect(output).toContain('graph TD');
     expect(output).toContain('validateToken');
-    expect(output).toContain('->');
+    expect(output).toContain('-->');
   });
 
   it('graph → review → no changes produces clean output', () => {

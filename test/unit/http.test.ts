@@ -93,10 +93,10 @@ describe('GET /api/tools', () => {
     expect(res.body.tools.length).toBeGreaterThan(0);
 
     const names = res.body.tools.map((t: any) => t.name);
-    expect(names).toContain('recon_query');
+    expect(names).toContain('recon_find');
     expect(names).toContain('recon_impact');
-    expect(names).toContain('recon_context');
-    expect(names).toContain('recon_processes');
+    expect(names).toContain('recon_explain');
+    expect(names).toContain('recon_export');
   });
 
   it('each tool has name, description, inputSchema', async () => {
@@ -180,12 +180,13 @@ describe('POST /api/tools/:name', () => {
     expect(res.body.error).toContain("'query'");
   });
 
-  it('includes next-step hint in response', async () => {
+  it('returns result without next-step hint', async () => {
     const res = await request(app)
       .post('/api/tools/recon_query')
       .send({ query: 'GetUser' });
 
-    expect(res.body.result).toContain('**Next:**');
+    expect(res.body.result).toBeDefined();
+    expect(res.body.result).not.toContain('**Next:**');
   });
 });
 
