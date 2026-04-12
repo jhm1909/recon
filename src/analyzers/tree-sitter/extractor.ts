@@ -12,6 +12,20 @@ import type { AnalyzerResult } from '../types.js';
 import { LANGUAGE_QUERIES } from './queries.js';
 import { setParserLanguage, isLanguageAvailable } from './parser.js';
 
+// ─── Test File Detection ────────────────────────────────────────
+
+const TEST_FILE_PATTERNS = [
+  /\.test\.[tj]sx?$/,
+  /\.spec\.[tj]sx?$/,
+  /_test\.[tj]sx?$/,
+  /[\\/]__tests__[\\/]/,
+  /[\\/]test[\\/]/,
+];
+
+function isTestFile(filePath: string): boolean {
+  return TEST_FILE_PATTERNS.some(p => p.test(filePath));
+}
+
 // ─── ID Prefixes ────────────────────────────────────────────────
 
 const LANG_PREFIX: Record<Language, string> = {
@@ -157,6 +171,7 @@ export interface ExtractedSymbol {
   language: Language;
   package: string;
   exported: boolean;
+  isTest?: boolean;
 }
 
 export interface ExtractedCall {
@@ -216,6 +231,7 @@ export function extractFromFile(
 
   const prefix = LANG_PREFIX[language] || language;
   const pkg = getPackage(filePath, language);
+  const fileIsTest = isTestFile(filePath);
   const symbols: ExtractedSymbol[] = [];
   const calls: ExtractedCall[] = [];
   const imports: ExtractedImport[] = [];
@@ -323,6 +339,7 @@ export function extractFromFile(
       language,
       package: pkg,
       exported: isExported(name, language, defNode || nameNode),
+      ...(fileIsTest ? { isTest: true } : {}),
     });
   }
 
@@ -352,6 +369,7 @@ export function buildGraphFromExtractions(
         language: sym.language,
         package: sym.package,
         exported: sym.exported,
+        ...(sym.isTest ? { isTest: true } : {}),
       });
 
       if (!symbolsByName.has(sym.name)) {

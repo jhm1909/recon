@@ -16,6 +16,20 @@ import type { Node, Relationship } from '../graph/types.js';
 import type { AnalyzerResult } from './types.js';
 import { hashFiles } from '../utils/hash.js';
 
+// ─── Test File Detection ─────────────────────────────────────
+
+const TEST_FILE_PATTERNS = [
+  /\.test\.[tj]sx?$/,
+  /\.spec\.[tj]sx?$/,
+  /_test\.[tj]sx?$/,
+  /[\\/]__tests__[\\/]/,
+  /[\\/]test[\\/]/,
+];
+
+function isTestFile(filePath: string): boolean {
+  return TEST_FILE_PATTERNS.some(p => p.test(filePath));
+}
+
 // ─── Internal Types ──────────────────────────────────────────
 
 interface FileSymbol {
@@ -71,9 +85,7 @@ function discoverTSFiles(srcRoot: string): string[] {
       if (
         entry.name === 'node_modules' ||
         entry.name === '.next' ||
-        entry.name === '__tests__' ||
         entry.name === 'dist' ||
-        entry.name === 'test' ||
         entry.name === '.reference' ||
         entry.name === '.recon' ||
         entry.name === 'messages' // i18n JSON files
@@ -85,10 +97,6 @@ function discoverTSFiles(srcRoot: string): string[] {
         walk(full);
       } else if (
         /\.(ts|tsx)$/.test(entry.name) &&
-        !entry.name.endsWith('.test.ts') &&
-        !entry.name.endsWith('.test.tsx') &&
-        !entry.name.endsWith('.spec.ts') &&
-        !entry.name.endsWith('.spec.tsx') &&
         !entry.name.endsWith('.d.ts')
       ) {
         files.push(full);
@@ -498,6 +506,8 @@ function buildGraph(
     const fileNodeId = `ts:file:${fileRelPath}`;
 
     // Create File node
+    const fileIsTest = isTestFile(fileRelPath);
+
     nodes.push({
       id: fileNodeId,
       type: NodeType.File,
@@ -508,6 +518,7 @@ function buildGraph(
       language: Language.TypeScript,
       package: filePkg,
       exported: true,
+      ...(fileIsTest ? { isTest: true } : {}),
     });
 
     // Create symbol nodes
@@ -549,6 +560,7 @@ function buildGraph(
         package: filePkg,
         exported: sym.isExported,
         isDefault: sym.isDefault,
+        ...(fileIsTest ? { isTest: true } : {}),
       });
 
       // DEFINES edge: File → Symbol
