@@ -576,9 +576,10 @@ def main():
     const extractions = makePythonExtraction();
     const result = buildGraphFromExtractions(extractions);
 
+    // Cross-file calls with no matching import path get 0.4 (different file, no import relationship)
     const calls = result.relationships.filter(r => r.type === RelationshipType.CALLS);
     for (const call of calls) {
-      expect(call.confidence).toBe(0.7);
+      expect(call.confidence).toBe(0.4);
     }
 
     const extends_ = result.relationships.filter(r => r.type === RelationshipType.EXTENDS);

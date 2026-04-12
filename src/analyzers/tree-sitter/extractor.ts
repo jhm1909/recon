@@ -379,10 +379,21 @@ export function buildGraphFromExtractions(
     }
   }
 
+  // Build import map: callerFile → Set of imported source paths
+  const importsByFile = new Map<string, Set<string>>();
+  for (const [filePath, result] of files) {
+    const sources = new Set<string>();
+    for (const imp of result.imports) {
+      sources.add(imp.source);
+    }
+    importsByFile.set(filePath, sources);
+  }
+
   // Pass 2: Resolve calls to CALLS relationships
   for (const [filePath, result] of files) {
     // Find caller symbols in this file
     const fileSymbols = result.symbols;
+    const callerImports = importsByFile.get(filePath) ?? new Set<string>();
 
     for (const call of result.calls) {
       const targets = symbolsByName.get(call.calleeName);
@@ -396,13 +407,26 @@ export function buildGraphFromExtractions(
       const target = targets.find(t => t.file !== filePath) || targets[0];
       if (target.id === caller.id) continue; // skip self-calls
 
+      // Contextual confidence scoring based on import evidence:
+      //  1.0 — import exists between source and target file + direct call
+      //  0.7 — same file, no import chain needed
+      //  0.4 — different file, no import relationship
+      let confidence: number;
+      if (target.file === filePath) {
+        confidence = 0.7; // Same file, no import chain needed
+      } else if (callerImports.has(target.file)) {
+        confidence = 1.0; // Import exists between files + direct call
+      } else {
+        confidence = 0.4; // Different file, no import relationship
+      }
+
       const relId = `${caller.id}-CALLS-${target.id}`;
       relationships.push({
         id: relId,
         type: RelationshipType.CALLS,
         sourceId: caller.id,
         targetId: target.id,
-        confidence: 0.7, // tree-sitter name-based resolution
+        confidence,
       });
     }
   }

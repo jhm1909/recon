@@ -255,12 +255,14 @@ export function buildCrossLanguageEdges(
       const constFileId = 'ts:file:apps/web/src/lib/constants.ts';
       if (!existingNodeIds.has(constFileId)) continue;
 
+      // Confidence: exact URL match → 0.9, pattern match (wildcards) → 0.6
+      const apiConfidence = route.normalized.includes('*') ? 0.6 : 0.9;
       relationships.push({
         id: `rel:api:${++relCounter}`,
         type: RelationshipType.CALLS_API,
         sourceId: constFileId,
         targetId: handlerNodeId,
-        confidence: 0.95,
+        confidence: apiConfidence,
         metadata: {
           httpMethod: route.method,
           urlPattern: route.pattern,
@@ -273,12 +275,14 @@ export function buildCrossLanguageEdges(
   // useApi(API.guilds.list) → useGuilds → GetGuilds
   const hookMappings = buildHookMappings(projectRoot, tsConstants, routeByPattern, existingNodeIds);
   for (const mapping of hookMappings) {
+    // Confidence: exact URL match → 0.9, pattern match (wildcards) → 0.6
+    const hookConfidence = normalizePattern(mapping.pattern).includes('*') ? 0.6 : 0.9;
     relationships.push({
       id: `rel:api:${++relCounter}`,
       type: RelationshipType.CALLS_API,
       sourceId: mapping.tsNodeId,
       targetId: mapping.goNodeId,
-      confidence: 0.85,
+      confidence: hookConfidence,
       metadata: {
         httpMethod: mapping.method,
         urlPattern: mapping.pattern,

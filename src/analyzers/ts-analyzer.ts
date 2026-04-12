@@ -692,17 +692,17 @@ function buildGraph(
       if (seenCallEdges.has(edgeKey)) continue;
       seenCallEdges.add(edgeKey);
 
-      // Tiered confidence scoring:
-      //  1.0 — same file (callee defined locally)
-      //  0.9 — callee explicitly imported in this file
-      //  0.7 — cross-file exported match (name-based)
+      // Contextual confidence scoring based on import evidence:
+      //  1.0 — import exists between source and target file + direct call
+      //  0.7 — same file, no import chain needed
+      //  0.4 — different file, no import relationship
       let confidence: number;
       if (localSymbols.has(call.calleeName)) {
-        confidence = 1.0; // Same file, high certainty
+        confidence = 0.7; // Same file, no import chain needed
       } else if (importedNames.has(call.calleeName)) {
-        confidence = 0.9; // Explicitly imported
+        confidence = 1.0; // Import exists + direct call → highest certainty
       } else {
-        confidence = 0.7; // Cross-file global name match
+        confidence = 0.4; // Cross-file, no import relationship
       }
 
       relationships.push({
