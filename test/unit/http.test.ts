@@ -209,11 +209,10 @@ describe('GET /api/resources/read?uri=...', () => {
     expect(res.body.content).toContain('total_relationships');
   });
 
-  it('reads recon://packages resource', async () => {
+  it('returns 404 for removed recon://packages resource', async () => {
     const res = await request(app).get('/api/resources/read?uri=recon://packages');
 
-    expect(res.status).toBe(200);
-    expect(res.body.content).toBeDefined();
+    expect(res.status).toBe(404);
   });
 
   it('reads recon://symbol/{name} resource', async () => {

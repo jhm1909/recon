@@ -360,42 +360,9 @@ describe('recon_explain shows execution flows', () => {
 
 // ─── Resource Tests ──────────────────────────────────────────────
 
-describe('recon://process/{name} resource', () => {
-  it('returns process trace as YAML', async () => {
-    const { readResource } = await import('../../src/mcp/resources.js');
-
-    const g = new KnowledgeGraph();
-    g.addNode(makeNode('h1', 'HandleRequest', {
-      file: 'handler/api.go',
-      package: 'handler',
-    }));
-    g.addNode(makeNode('s1', 'DoWork', {
-      file: 'service/work.go',
-      package: 'service',
-    }));
-    g.addRelationship(makeRel('h1', 's1'));
-
-    const result = readResource('recon://process/HandleRequest', g);
-    expect(result).toContain('name: "HandleRequest"');
-    expect(result).toContain('complexity:');
-    expect(result).toContain('steps:');
-    expect(result).toContain('DoWork');
-  });
-
-  it('returns error for unknown process', async () => {
-    const { readResource } = await import('../../src/mcp/resources.js');
-
-    const g = new KnowledgeGraph();
-    const result = readResource('recon://process/DoesNotExist', g);
-    expect(result).toContain('error:');
-    expect(result).toContain('not found');
-  });
-
-  it('parseUri handles process URIs', async () => {
+describe('recon://process/{name} resource (removed in v6)', () => {
+  it('recon://process URI throws Unknown resource URI (resource removed)', async () => {
     const { parseUri } = await import('../../src/mcp/resources.js');
-
-    const parsed = parseUri('recon://process/Handler.GetUser');
-    expect(parsed.resourceType).toBe('process');
-    expect(parsed.param).toBe('Handler.GetUser');
+    expect(() => parseUri('recon://process/Handler.GetUser')).toThrow('Unknown resource URI');
   });
 });

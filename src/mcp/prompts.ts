@@ -6,9 +6,9 @@
  * that leverage Recon's tools and resources.
  *
  * Prompts:
- *   detect_impact  — Pre-commit change analysis
- *   generate_map   — Architecture documentation from the knowledge graph
- *   onboard        — Codebase onboarding guide for new developers
+ *   pre_commit   — Pre-commit impact analysis
+ *   architecture — Generate architecture documentation
+ *   onboard      — Codebase onboarding guide
  */
 
 export interface ReconPrompt {
@@ -23,47 +23,19 @@ export interface ReconPrompt {
 
 export const RECON_PROMPTS: ReconPrompt[] = [
     {
-        name: 'detect_impact',
-        description:
-            'Analyze the impact of your current changes before committing. ' +
-            'Detects changed symbols, maps them to affected processes, and ' +
-            'produces a risk report with blast radius analysis.',
-        arguments: [
-            {
-                name: 'scope',
-                description:
-                    'What to analyze: "unstaged" (working tree), "staged" (git index), ' +
-                    '"all" (both), or "compare" (branch diff). Default: all',
-                required: false,
-            },
-            {
-                name: 'base_ref',
-                description: 'Branch or commit to compare against (only for scope=compare)',
-                required: false,
-            },
-        ],
+        name: 'pre_commit',
+        description: 'Pre-commit impact analysis',
+        arguments: [{ name: 'scope', description: 'staged or unstaged', required: false }],
     },
     {
-        name: 'generate_map',
-        description:
-            'Generate architecture documentation from the knowledge graph. ' +
-            'Creates a codebase overview with functional areas, execution flows, ' +
-            'and a mermaid architecture diagram.',
+        name: 'architecture',
+        description: 'Generate architecture documentation',
         arguments: [],
     },
     {
         name: 'onboard',
-        description:
-            'Generate a codebase onboarding guide for new developers. ' +
-            'Walks through project structure, critical paths, entry points, ' +
-            'and suggested reading order for understanding the architecture.',
-        arguments: [
-            {
-                name: 'focus',
-                description: 'Optional area to focus on (e.g., "api", "auth", "database")',
-                required: false,
-            },
-        ],
+        description: 'Codebase onboarding guide',
+        arguments: [],
     },
 ];
 
@@ -75,13 +47,9 @@ export function getPromptMessages(
     args?: Record<string, string>,
 ): Array<{ role: 'user'; content: { type: 'text'; text: string } }> {
 
-    if (name === 'detect_impact') {
-        const scope = args?.scope || 'all';
-        const baseRef = args?.base_ref || '';
-        const changesArgs = JSON.stringify({
-            scope,
-            ...(baseRef ? { base_ref: baseRef } : {}),
-        });
+    if (name === 'pre_commit') {
+        const scope = args?.scope || 'unstaged';
+        const changesArgs = JSON.stringify({ scope });
 
         return [{
             role: 'user' as const,
@@ -90,20 +58,19 @@ export function getPromptMessages(
                 text: `Analyze the impact of my current code changes before committing.
 
 Follow these steps:
-1. Run \`recon_detect_changes(${changesArgs})\` to find what changed and affected processes
-2. For each changed symbol in critical processes, run \`recon_context({name: "<symbol>"})\` to see its full reference graph
-3. For any high-risk items (many callers or cross-process), run \`recon_impact({target: "<symbol>", direction: "upstream"})\` for blast radius
-4. READ \`recon://processes\` to check which execution flows are affected
-5. Summarize as a clear risk report:
+1. Run \`recon_changes(${changesArgs})\` to find what changed and affected symbols
+2. For each changed symbol, run \`recon_explain({name: "<symbol>"})\` to see its full reference graph
+3. For any high-risk items (many callers or cross-language), run \`recon_impact({target: "<symbol>", direction: "upstream"})\` for blast radius
+4. Summarize as a clear risk report:
    - **Changes**: list of modified symbols
-   - **Affected processes**: which execution flows are impacted
+   - **Blast radius**: which callers and tests are affected
    - **Risk level**: LOW / MEDIUM / HIGH / CRITICAL
    - **Recommended actions**: what to test or review`,
             },
         }];
     }
 
-    if (name === 'generate_map') {
+    if (name === 'architecture') {
         return [{
             role: 'user' as const,
             content: {
@@ -112,15 +79,14 @@ Follow these steps:
 
 Follow these steps:
 1. READ \`recon://stats\` for codebase overview (nodes, edges, languages)
-2. Run \`recon_packages()\` to see all functional areas / packages
-3. Run \`recon_processes({limit: 10})\` to see the top execution flows
-4. For the top 3 most important processes, run \`recon_context({name: "<entry_function>"})\` for detailed views
-5. Run \`recon_api_map()\` for API endpoint mapping
-6. Generate an ARCHITECTURE.md file with:
+2. Run \`recon_map()\` to see all functional areas / packages
+3. Run \`recon_rules()\` to identify code quality issues and key patterns
+4. For the top entry points, run \`recon_explain({name: "<entry_function>"})\` for detailed views
+5. Generate an ARCHITECTURE.md file with:
    - **Overview**: project purpose and tech stack
    - **Structure**: package/module organization
-   - **Key Execution Flows**: the top 5 processes with descriptions
-   - **API Map**: endpoints and their handlers
+   - **Key Entry Points**: main functions and their roles
+   - **Code Quality**: issues flagged by rules
    - **Mermaid Diagram**: architecture diagram showing major areas and connections
 
 Use mermaid graph TD syntax for the architecture diagram.`,
@@ -129,23 +95,18 @@ Use mermaid graph TD syntax for the architecture diagram.`,
     }
 
     if (name === 'onboard') {
-        const focus = args?.focus || '';
-        const focusInstruction = focus
-            ? `Pay special attention to the "${focus}" area and its related components.`
-            : 'Cover the entire codebase at a high level.';
-
         return [{
             role: 'user' as const,
             content: {
                 type: 'text' as const,
                 text: `Create a codebase onboarding guide for a new developer joining this project.
-${focusInstruction}
+Cover the entire codebase at a high level.
 
 Follow these steps:
 1. READ \`recon://stats\` for project overview
-2. Run \`recon_packages()\` to understand the module structure
-3. Run \`recon_processes({limit: 5})\` to identify the most important execution flows
-4. For each key entry point, run \`recon_context({name: "<function>"})\` to see what it connects to${focus ? `\n5. Run \`recon_search({query: "${focus}"})\` to find relevant symbols in the focus area` : ''}
+2. Run \`recon_map()\` to understand the module structure
+3. Run \`recon_find({query: "entry point"})\` to identify the most important entry points
+4. For each key entry point, run \`recon_explain({name: "<function>"})\` to see what it connects to
 
 Generate an ONBOARDING.md with:
 - **Project Overview**: what this project does

@@ -14,15 +14,15 @@ describe('RECON_PROMPTS', () => {
         expect(RECON_PROMPTS).toHaveLength(3);
     });
 
-    it('has detect_impact prompt', () => {
-        const p = RECON_PROMPTS.find(p => p.name === 'detect_impact');
+    it('has pre_commit prompt', () => {
+        const p = RECON_PROMPTS.find(p => p.name === 'pre_commit');
         expect(p).toBeDefined();
         expect(p!.description).toContain('impact');
         expect(p!.arguments.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('has generate_map prompt', () => {
-        const p = RECON_PROMPTS.find(p => p.name === 'generate_map');
+    it('has architecture prompt', () => {
+        const p = RECON_PROMPTS.find(p => p.name === 'architecture');
         expect(p).toBeDefined();
         expect(p!.description).toContain('architecture');
     });
@@ -30,36 +30,30 @@ describe('RECON_PROMPTS', () => {
     it('has onboard prompt', () => {
         const p = RECON_PROMPTS.find(p => p.name === 'onboard');
         expect(p).toBeDefined();
-        expect(p!.description).toContain('onboarding');
+        expect(p!.description).toContain('onboard');
     });
 });
 
 describe('getPromptMessages', () => {
-    it('returns detect_impact messages', () => {
-        const messages = getPromptMessages('detect_impact');
+    it('returns pre_commit messages', () => {
+        const messages = getPromptMessages('pre_commit');
         expect(messages).toHaveLength(1);
         expect(messages[0].role).toBe('user');
         expect(messages[0].content.type).toBe('text');
-        expect(messages[0].content.text).toContain('recon_detect_changes');
+        expect(messages[0].content.text).toContain('recon_changes');
         expect(messages[0].content.text).toContain('recon_impact');
     });
 
-    it('detect_impact accepts scope param', () => {
-        const messages = getPromptMessages('detect_impact', { scope: 'staged' });
+    it('pre_commit accepts scope param', () => {
+        const messages = getPromptMessages('pre_commit', { scope: 'staged' });
         expect(messages[0].content.text).toContain('"staged"');
     });
 
-    it('detect_impact accepts base_ref param', () => {
-        const messages = getPromptMessages('detect_impact', { scope: 'compare', base_ref: 'main' });
-        expect(messages[0].content.text).toContain('"compare"');
-        expect(messages[0].content.text).toContain('"base_ref"');
-    });
-
-    it('returns generate_map messages', () => {
-        const messages = getPromptMessages('generate_map');
+    it('returns architecture messages', () => {
+        const messages = getPromptMessages('architecture');
         expect(messages).toHaveLength(1);
         expect(messages[0].content.text).toContain('recon://stats');
-        expect(messages[0].content.text).toContain('recon_packages');
+        expect(messages[0].content.text).toContain('recon_map');
         expect(messages[0].content.text).toContain('ARCHITECTURE.md');
     });
 
@@ -70,13 +64,7 @@ describe('getPromptMessages', () => {
         expect(messages[0].content.text).toContain('ONBOARDING.md');
     });
 
-    it('onboard accepts focus param', () => {
-        const messages = getPromptMessages('onboard', { focus: 'auth' });
-        expect(messages[0].content.text).toContain('"auth"');
-        expect(messages[0].content.text).toContain('recon_search');
-    });
-
-    it('onboard without focus covers entire codebase', () => {
+    it('onboard covers entire codebase', () => {
         const messages = getPromptMessages('onboard');
         expect(messages[0].content.text).toContain('entire codebase');
     });
