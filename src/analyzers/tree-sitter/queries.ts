@@ -46,6 +46,22 @@ export const PYTHON_QUERIES = `
   name: (identifier) @heritage.class
   superclasses: (argument_list
     (identifier) @heritage.extends)) @heritage
+
+(assignment
+  left: (identifier) @name
+  type: (type) @type_annotation) @definition.type
+
+(decorated_definition
+  (decorator (identifier) @decorator.name)
+  definition: (function_definition name: (identifier) @decorated.func.name)) @decorator
+
+(decorated_definition
+  (decorator (attribute attribute: (identifier) @decorator.name))
+  definition: (function_definition name: (identifier) @decorated.func.name)) @decorator
+
+(decorated_definition
+  (decorator (identifier) @decorator.name)
+  definition: (class_definition name: (identifier) @decorated.class.name)) @decorator
 `;
 
 // ─── Rust ───────────────────────────────────────────────────────
@@ -75,6 +91,14 @@ export const RUST_QUERIES = `
 (impl_item trait: (generic_type type: (type_identifier) @heritage.trait) type: (type_identifier) @heritage.class) @heritage
 (impl_item trait: (type_identifier) @heritage.trait type: (generic_type type: (type_identifier) @heritage.class)) @heritage
 (impl_item trait: (generic_type type: (type_identifier) @heritage.trait) type: (generic_type type: (type_identifier) @heritage.class)) @heritage
+
+(enum_item
+  body: (enum_variant_list
+    (enum_variant name: (identifier) @name))) @definition.const
+
+(attribute_item
+  (attribute
+    (identifier) @attr.name)) @attribute
 `;
 
 // ─── Java ───────────────────────────────────────────────────────
@@ -98,6 +122,15 @@ export const JAVA_QUERIES = `
 
 (class_declaration name: (identifier) @heritage.class
   (super_interfaces (type_list (type_identifier) @heritage.implements))) @heritage.impl
+
+(enum_body
+  (enum_constant name: (identifier) @name)) @definition.const
+
+(marker_annotation name: (identifier) @annotation.name) @annotation
+(annotation name: (identifier) @annotation.name) @annotation
+
+(constant_declaration
+  declarator: (variable_declarator name: (identifier) @name)) @definition.const
 `;
 
 // ─── C ──────────────────────────────────────────────────────────
@@ -120,6 +153,10 @@ export const C_QUERIES = `
 
 (call_expression function: (identifier) @call.name) @call
 (call_expression function: (field_expression field: (field_identifier) @call.name)) @call
+
+(enum_specifier
+  body: (enumerator_list
+    (enumerator name: (identifier) @name))) @definition.const
 `;
 
 // ─── C++ ────────────────────────────────────────────────────────
@@ -154,6 +191,12 @@ export const CPP_QUERIES = `
   (base_class_clause (type_identifier) @heritage.extends)) @heritage
 (class_specifier name: (type_identifier) @heritage.class
   (base_class_clause (access_specifier) (type_identifier) @heritage.extends)) @heritage
+
+(enum_specifier
+  body: (enumerator_list
+    (enumerator name: (identifier) @name))) @definition.const
+
+(alias_declaration name: (type_identifier) @name) @definition.type
 `;
 
 // ─── Ruby ───────────────────────────────────────────────────────
@@ -170,6 +213,8 @@ export const RUBY_QUERIES = `
 
 (class name: (constant) @heritage.class
   superclass: (superclass (constant) @heritage.extends)) @heritage
+
+(assignment left: (constant) @name) @definition.const
 `;
 
 // ─── PHP ────────────────────────────────────────────────────────
@@ -196,6 +241,10 @@ export const PHP_QUERIES = `
 
 (class_declaration name: (name) @heritage.class
   (class_interface_clause (name) @heritage.implements)) @heritage.impl
+
+(const_declaration (const_element (name) @name)) @definition.const
+
+(attribute (name) @annotation.name) @annotation
 `;
 
 // ─── C# ─────────────────────────────────────────────────────────
@@ -218,6 +267,10 @@ export const CSHARP_QUERIES = `
 
 (class_declaration name: (identifier) @heritage.class
   (base_list (identifier) @heritage.extends)) @heritage
+
+(enum_member_declaration name: (identifier) @name) @definition.const
+
+(attribute (identifier) @annotation.name) @annotation
 `;
 
 // ─── Kotlin ─────────────────────────────────────────────────────
@@ -236,6 +289,12 @@ export const KOTLIN_QUERIES = `
 
 (class_declaration (type_identifier) @heritage.class
   (delegation_specifier_list (delegation_specifier (user_type (type_identifier) @heritage.extends)))) @heritage
+
+(enum_entry (simple_identifier) @name) @definition.const
+
+(type_alias (type_identifier) @name) @definition.type
+
+(annotation (user_type (type_identifier) @annotation.name)) @annotation
 `;
 
 // ─── Swift ──────────────────────────────────────────────────────
@@ -255,6 +314,8 @@ export const SWIFT_QUERIES = `
 
 (class_declaration name: (type_identifier) @heritage.class
   (inheritance_specifier (type_identifier) @heritage.extends)) @heritage
+
+(typealias_declaration (type_identifier) @name) @definition.type
 `;
 
 // ─── Query Map ──────────────────────────────────────────────────

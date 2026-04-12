@@ -172,6 +172,7 @@ export interface ExtractedSymbol {
   package: string;
   exported: boolean;
   isTest?: boolean;
+  decorators?: string[];
 }
 
 export interface ExtractedCall {
@@ -238,11 +239,62 @@ export function extractFromFile(
   const heritage: ExtractedHeritage[] = [];
   const seenDefs = new Set<string>();
   const seenHeritage = new Set<string>();
+  // Track decorators/annotations: store by 0-based row of the annotation itself
+  interface AnnotationInfo { name: string; row: number; }
+  const pendingAnnotations: AnnotationInfo[] = [];
+  // Track test attribute rows (0-based)
+  const testAttrRows = new Set<number>();
+  // Python decorators: keyed by the decorated definition's name-node start row (0-based)
+  const pyDecoratorsByNameRow = new Map<number, string[]>();
+
+  // First pass: collect decorators, annotations, and test attributes
+  for (const match of matches) {
+    const captureMap: Record<string, any> = {};
+    for (const c of match.captures) {
+      captureMap[c.name] = c.node;
+    }
+
+    // Python decorators — directly tied to the decorated definition's name node
+    if (captureMap['decorator'] && captureMap['decorator.name']) {
+      const decoratorName = captureMap['decorator.name'].text;
+      const decoratedName = captureMap['decorated.func.name'] || captureMap['decorated.class.name'];
+      if (decoratedName) {
+        const nameRow = decoratedName.startPosition.row;
+        if (!pyDecoratorsByNameRow.has(nameRow)) pyDecoratorsByNameRow.set(nameRow, []);
+        pyDecoratorsByNameRow.get(nameRow)!.push(decoratorName);
+      }
+    }
+
+    // Java/C#/PHP/Kotlin annotations — store the annotation's own row
+    if (captureMap['annotation'] && captureMap['annotation.name']) {
+      const annotationName = captureMap['annotation.name'].text;
+      const annotationNode = captureMap['annotation'];
+      const row = annotationNode.startPosition.row;
+      pendingAnnotations.push({ name: annotationName, row });
+
+      if (annotationName === 'Test' || annotationName === 'test') {
+        testAttrRows.add(row);
+      }
+    }
+
+    // Rust #[test] attribute — store the attribute's own row
+    if (captureMap['attribute'] && captureMap['attr.name']) {
+      const attrName = captureMap['attr.name'].text;
+      if (attrName === 'test') {
+        testAttrRows.add(captureMap['attribute'].startPosition.row);
+      }
+    }
+  }
 
   for (const match of matches) {
     const captureMap: Record<string, any> = {};
     for (const c of match.captures) {
       captureMap[c.name] = c.node;
+    }
+
+    // ── Skip decorator/annotation/attribute matches (handled in first pass) ──
+    if (captureMap['decorator'] || captureMap['annotation'] || captureMap['attribute']) {
+      continue;
     }
 
     // ── Imports ──
@@ -329,6 +381,40 @@ export function extractFromFile(
 
     const id = `${prefix}:${nodeTypeToIdSegment(nodeType)}:${filePath}:${name}:${startLine}`;
 
+    // Check for Python decorators (matched by name node row)
+    const pyDecorators = pyDecoratorsByNameRow.get(nameNode.startPosition.row);
+
+    // Check for annotations/attributes that belong to this definition.
+    // An annotation belongs to a definition if:
+    //   - It is on a line within the definition range (inside the node), OR
+    //   - It is on a line immediately preceding the definition start (sibling attribute)
+    // We only attach to the narrowest definition that satisfies these conditions,
+    // which we approximate by checking that the name row matches closely.
+    const defStartRow = defNode ? defNode.startPosition.row : nameNode.startPosition.row;
+    const nameStartRow = nameNode.startPosition.row;
+    const matchedAnnotations: string[] = [];
+    let isTestMarked = false;
+    for (const ann of pendingAnnotations) {
+      // Annotation is inside definition range OR immediately preceding the name
+      const isInside = ann.row >= defStartRow && ann.row <= nameStartRow;
+      if (isInside) {
+        matchedAnnotations.push(ann.name);
+      }
+    }
+    // Check test attributes (Rust #[test]) — same logic
+    for (const testRow of testAttrRows) {
+      const isInside = testRow >= defStartRow - 1 && testRow <= nameStartRow;
+      if (isInside) {
+        isTestMarked = true;
+        break;
+      }
+    }
+
+    const attachedDecorators = pyDecorators
+      ? [...pyDecorators, ...matchedAnnotations]
+      : matchedAnnotations.length > 0 ? matchedAnnotations : undefined;
+    const symbolIsTest = fileIsTest || isTestMarked;
+
     symbols.push({
       id,
       name,
@@ -339,7 +425,8 @@ export function extractFromFile(
       language,
       package: pkg,
       exported: isExported(name, language, defNode || nameNode),
-      ...(fileIsTest ? { isTest: true } : {}),
+      ...(symbolIsTest ? { isTest: true } : {}),
+      ...(attachedDecorators && attachedDecorators.length > 0 ? { decorators: [...attachedDecorators] } : {}),
     });
   }
 
