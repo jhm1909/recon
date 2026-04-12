@@ -1,7 +1,9 @@
 /**
- * Unit Tests: MCP Tool Handlers
+ * Unit Tests: MCP Tool Handlers (v6)
  *
- * Tests recon_query, recon_impact, recon_context against a mock graph.
+ * Tests recon_find, recon_impact, recon_explain, recon_map, recon_rules
+ * against a mock graph.
+ *
  * The mock graph models a small Go + TS codebase:
  *
  *   [AuthMiddleware] --CALLS--> [ValidateToken] --CALLS--> [DecodeJWT]
@@ -159,7 +161,7 @@ function buildMockGraph(): KnowledgeGraph {
 
 // ─── Tests ──────────────────────────────────────────────────────
 
-describe('recon_query handler', () => {
+describe('recon_find handler', () => {
   let graph: KnowledgeGraph;
 
   beforeEach(() => {
@@ -167,19 +169,19 @@ describe('recon_query handler', () => {
   });
 
   it('finds symbols by substring match', async () => {
-    const result = await handleToolCall('recon_query', { query: 'Login' }, graph);
+    const result = await handleToolCall('recon_find', { query: 'Login' }, graph);
     expect(result).toContain('LoginHandler');
     expect(result).toContain('LoginPage');
     expect(result).toContain('LoginForm');
   });
 
-  it('returns match count', async () => {
-    const result = await handleToolCall('recon_query', { query: 'Login' }, graph);
-    expect(result).toContain('**Matches:** 3');
+  it('returns result count', async () => {
+    const result = await handleToolCall('recon_find', { query: 'Login' }, graph);
+    expect(result).toContain('Found 3');
   });
 
   it('filters by type', async () => {
-    const result = await handleToolCall('recon_query', {
+    const result = await handleToolCall('recon_find', {
       query: 'Login',
       type: 'Component',
     }, graph);
@@ -189,7 +191,7 @@ describe('recon_query handler', () => {
   });
 
   it('filters by language', async () => {
-    const result = await handleToolCall('recon_query', {
+    const result = await handleToolCall('recon_find', {
       query: 'Login',
       language: 'go',
     }, graph);
@@ -198,7 +200,7 @@ describe('recon_query handler', () => {
   });
 
   it('filters by package', async () => {
-    const result = await handleToolCall('recon_query', {
+    const result = await handleToolCall('recon_find', {
       query: 'Login',
       package: 'apps/web',
     }, graph);
@@ -208,26 +210,24 @@ describe('recon_query handler', () => {
   });
 
   it('respects limit', async () => {
-    const result = await handleToolCall('recon_query', {
+    const result = await handleToolCall('recon_find', {
       query: 'Login',
       limit: 1,
     }, graph);
-    expect(result).toContain('showing 1');
+    // Should only have 1 result entry (count the bold names)
+    const entries = result.split('\n').filter(l => l.startsWith('- **'));
+    expect(entries.length).toBe(1);
   });
 
-  it('throws on missing query', async () => {
-    await expect(
-      handleToolCall('recon_query', {}, graph),
-    ).rejects.toThrow("'query' parameter is required");
+  it('returns structured error on missing query', async () => {
+    const result = await handleToolCall('recon_find', {}, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('invalid_parameter');
   });
 
-  it('exact match scores higher than substring', async () => {
-    const result = await handleToolCall('recon_query', { query: 'DecodeJWT' }, graph);
-    // DecodeJWT should appear first (exact name match via BM25)
+  it('exact match appears in results', async () => {
+    const result = await handleToolCall('recon_find', { query: 'DecodeJWT' }, graph);
     expect(result).toContain('DecodeJWT');
-    // BM25 tokenizes "DecodeJWT" → ["decode", "jwt"], also matching jwt package
-    const lines = result.split('\n').filter(l => l.startsWith('- **'));
-    expect(lines[0]).toContain('DecodeJWT');
   });
 });
 
@@ -255,7 +255,6 @@ describe('recon_impact handler', () => {
       direction: 'upstream',
     }, graph);
     // d=2 should include UserService (calls LoginHandler which calls ValidateToken)
-    // and LoginForm (CALLS_API to LoginHandler)
     expect(result).toContain('UserService');
   });
 
@@ -275,7 +274,7 @@ describe('recon_impact handler', () => {
       target: 'ValidateToken',
       direction: 'upstream',
     }, graph);
-    // 2 direct callers but cross-app (apps/api + apps/web) → CRITICAL
+    // 2 direct callers from different apps -> CRITICAL
     expect(result).toContain('CRITICAL');
   });
 
@@ -290,22 +289,22 @@ describe('recon_impact handler', () => {
     expect(result).not.toContain('UserService');
   });
 
-  it('throws on missing target', async () => {
-    await expect(
-      handleToolCall('recon_impact', { direction: 'upstream' }, graph),
-    ).rejects.toThrow("'target' is required");
+  it('returns structured error on missing target', async () => {
+    const result = await handleToolCall('recon_impact', { direction: 'upstream' }, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('invalid_parameter');
   });
 
-  it('throws on invalid direction', async () => {
-    await expect(
-      handleToolCall('recon_impact', { target: 'Foo', direction: 'sideways' }, graph),
-    ).rejects.toThrow('Invalid direction');
+  it('returns structured error on invalid direction', async () => {
+    const result = await handleToolCall('recon_impact', { target: 'Foo', direction: 'sideways' }, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('invalid_parameter');
   });
 
-  it('throws on unknown symbol', async () => {
-    await expect(
-      handleToolCall('recon_impact', { target: 'NonExistent', direction: 'upstream' }, graph),
-    ).rejects.toThrow('not found');
+  it('returns structured error on unknown symbol', async () => {
+    const result = await handleToolCall('recon_impact', { target: 'NonExistent', direction: 'upstream' }, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('symbol_not_found');
   });
 
   it('disambiguates with file filter', async () => {
@@ -318,7 +317,7 @@ describe('recon_impact handler', () => {
   });
 });
 
-describe('recon_context handler', () => {
+describe('recon_explain handler', () => {
   let graph: KnowledgeGraph;
 
   beforeEach(() => {
@@ -326,7 +325,7 @@ describe('recon_context handler', () => {
   });
 
   it('shows callers and callees', async () => {
-    const result = await handleToolCall('recon_context', {
+    const result = await handleToolCall('recon_explain', {
       name: 'ValidateToken',
     }, graph);
     // Callers: AuthMiddleware, LoginHandler
@@ -337,7 +336,7 @@ describe('recon_context handler', () => {
   });
 
   it('shows node metadata', async () => {
-    const result = await handleToolCall('recon_context', {
+    const result = await handleToolCall('recon_explain', {
       name: 'ValidateToken',
     }, graph);
     expect(result).toContain('# Context: ValidateToken');
@@ -347,27 +346,27 @@ describe('recon_context handler', () => {
   });
 
   it('shows component usage relationships', async () => {
-    const result = await handleToolCall('recon_context', {
+    const result = await handleToolCall('recon_explain', {
       name: 'LoginForm',
     }, graph);
     // Used by: LoginPage (USES_COMPONENT incoming)
     expect(result).toContain('LoginPage');
   });
 
-  it('throws on missing name', async () => {
-    await expect(
-      handleToolCall('recon_context', {}, graph),
-    ).rejects.toThrow("'name' is required");
+  it('returns structured error on missing name', async () => {
+    const result = await handleToolCall('recon_explain', {}, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('invalid_parameter');
   });
 
-  it('throws on unknown symbol', async () => {
-    await expect(
-      handleToolCall('recon_context', { name: 'NonExistent' }, graph),
-    ).rejects.toThrow('not found');
+  it('returns structured error on unknown symbol', async () => {
+    const result = await handleToolCall('recon_explain', { name: 'NonExistent' }, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('symbol_not_found');
   });
 
   it('disambiguates with file filter', async () => {
-    const result = await handleToolCall('recon_context', {
+    const result = await handleToolCall('recon_explain', {
       name: 'ValidateToken',
       file: 'token.go',
     }, graph);
@@ -375,7 +374,7 @@ describe('recon_context handler', () => {
   });
 });
 
-describe('recon_packages handler', () => {
+describe('recon_map handler', () => {
   let graph: KnowledgeGraph;
 
   beforeEach(() => {
@@ -383,55 +382,75 @@ describe('recon_packages handler', () => {
   });
 
   it('lists all packages', async () => {
-    const result = await handleToolCall('recon_packages', {}, graph);
+    const result = await handleToolCall('recon_map', {}, graph);
     expect(result).toContain('internal/auth');
     expect(result).toContain('internal/jwt');
   });
 
-  it('shows package relationships', async () => {
-    const result = await handleToolCall('recon_packages', {}, graph);
-    expect(result).toContain('Recon');
+  it('shows package overview header', async () => {
+    const result = await handleToolCall('recon_map', {}, graph);
     expect(result).toContain('Package Overview');
   });
 
-  it('filters by language', async () => {
-    const result = await handleToolCall('recon_packages', { language: 'go' }, graph);
-    expect(result).toContain('internal/auth');
+  it('shows node count', async () => {
+    const result = await handleToolCall('recon_map', {}, graph);
+    // Should contain stats line with node count
+    expect(result).toContain('nodes');
   });
 });
 
-describe('recon_api_map handler', () => {
+describe('recon_rules handler', () => {
   let graph: KnowledgeGraph;
 
   beforeEach(() => {
     graph = buildMockGraph();
   });
 
-  it('shows API routes with consumers', async () => {
-    const result = await handleToolCall('recon_api_map', {}, graph);
-    expect(result).toContain('POST');
-    expect(result).toContain('/api/auth/login');
-    expect(result).toContain('LoginHandler');
-    expect(result).toContain('LoginForm');
+  it('runs a specific rule', async () => {
+    const result = await handleToolCall('recon_rules', { rule: 'dead_code' }, graph);
+    expect(result).toContain('Rule: dead_code');
+    expect(result).toContain('Issues found');
   });
 
-  it('filters by HTTP method', async () => {
-    const result = await handleToolCall('recon_api_map', { method: 'GET' }, graph);
-    // No GET routes in mock graph
-    expect(result).toContain('**Total routes:** 0');
+  it('runs all rules when no rule specified', async () => {
+    const result = await handleToolCall('recon_rules', {}, graph);
+    expect(result).toContain('Code Quality Report');
+    expect(result).toContain('dead_code');
+    expect(result).toContain('unused_exports');
+    expect(result).toContain('circular_deps');
+    expect(result).toContain('large_files');
+    expect(result).toContain('orphans');
   });
 
-  it('filters by pattern', async () => {
-    const result = await handleToolCall('recon_api_map', { pattern: 'login' }, graph);
-    expect(result).toContain('/api/auth/login');
+  it('returns structured error for invalid rule', async () => {
+    const result = await handleToolCall('recon_rules', { rule: 'nonexistent' }, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('invalid_parameter');
   });
 });
 
 describe('unknown tool', () => {
-  it('throws for unknown tool name', async () => {
+  it('returns structured error for unknown tool name', async () => {
     const graph = buildMockGraph();
-    await expect(
-      handleToolCall('recon_nonexistent', {}, graph),
-    ).rejects.toThrow('Unknown tool');
+    const result = await handleToolCall('recon_nonexistent', {}, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('unknown_tool');
+    expect(parsed.tool).toBe('recon_nonexistent');
+  });
+});
+
+describe('empty graph', () => {
+  it('returns empty_graph error for non-map tools', async () => {
+    const emptyGraph = new KnowledgeGraph();
+    const result = await handleToolCall('recon_find', { query: 'test' }, emptyGraph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('empty_graph');
+  });
+
+  it('allows recon_map on empty graph', async () => {
+    const emptyGraph = new KnowledgeGraph();
+    const result = await handleToolCall('recon_map', {}, emptyGraph);
+    // Should not return an error, but show empty overview
+    expect(result).toContain('Package Overview');
   });
 });

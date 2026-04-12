@@ -114,9 +114,9 @@ describe('GET /api/tools', () => {
 // ─── Tool Execution ─────────────────────────────────────────────
 
 describe('POST /api/tools/:name', () => {
-  it('executes recon_query and returns results', async () => {
+  it('executes recon_find and returns results', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_query')
+      .post('/api/tools/recon_find')
       .send({ query: 'GetUser' });
 
     expect(res.status).toBe(200);
@@ -124,9 +124,9 @@ describe('POST /api/tools/:name', () => {
     expect(res.body.result).toContain('GetUser');
   });
 
-  it('executes recon_context and returns symbol info', async () => {
+  it('executes recon_explain and returns symbol info', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_context')
+      .post('/api/tools/recon_explain')
       .send({ name: 'GetUser' });
 
     expect(res.status).toBe(200);
@@ -144,45 +144,38 @@ describe('POST /api/tools/:name', () => {
     expect(res.body.result).toContain('GetUser'); // Caller
   });
 
-  it('executes recon_packages and returns response', async () => {
+  it('executes recon_map and returns response', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_packages')
+      .post('/api/tools/recon_map')
       .send({});
 
     expect(res.status).toBe(200);
     expect(res.body.result).toBeDefined();
   });
 
-  it('executes recon_processes and returns flows', async () => {
-    const res = await request(app)
-      .post('/api/tools/recon_processes')
-      .send({});
-
-    expect(res.status).toBe(200);
-    expect(res.body.result).toBeDefined();
-  });
-
-  it('returns 400 for unknown tool', async () => {
+  it('returns structured error for unknown tool', async () => {
     const res = await request(app)
       .post('/api/tools/nonexistent_tool')
       .send({});
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBeDefined();
+    expect(res.status).toBe(200);
+    const parsed = JSON.parse(res.body.result);
+    expect(parsed.error).toBe('unknown_tool');
   });
 
-  it('returns 400 for missing required params', async () => {
+  it('returns structured error for missing required params', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_query')
+      .post('/api/tools/recon_find')
       .send({});
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toContain("'query'");
+    expect(res.status).toBe(200);
+    const parsed = JSON.parse(res.body.result);
+    expect(parsed.error).toBe('invalid_parameter');
   });
 
   it('returns result without next-step hint', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_query')
+      .post('/api/tools/recon_find')
       .send({ query: 'GetUser' });
 
     expect(res.body.result).toBeDefined();
