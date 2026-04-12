@@ -12,3 +12,10 @@ export interface AnalyzerResult {
   nodes: Node[];
   relationships: Relationship[];
 }
+
+// ─── Analyzer Warning ───────────────────────────────────────────
+
+export interface AnalyzerWarning {
+  file: string;
+  reason: string;
+}

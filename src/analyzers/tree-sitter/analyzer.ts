@@ -8,7 +8,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { Language } from '../../graph/types.js';
-import type { AnalyzerResult } from '../types.js';
+import type { AnalyzerResult, AnalyzerWarning } from '../types.js';
 import { getLanguageForFile, isLanguageAvailable, getAvailableLanguages } from './parser.js';
 import { extractFromFile, buildGraphFromExtractions } from './extractor.js';
 import type { FileExtractionResult } from './extractor.js';
@@ -85,6 +85,7 @@ export interface TreeSitterAnalysisResult {
     languages: Record<string, number>;
   };
   fileHashes: Record<string, string>;
+  warnings: AnalyzerWarning[];
 }
 
 /**
@@ -103,12 +104,14 @@ export function analyzeTreeSitter(
       result: { nodes: [], relationships: [] },
       stats: { files: 0, symbols: 0, calls: 0, skipped: 0, languages: {} },
       fileHashes: {},
+      warnings: [],
     };
   }
 
   const sourceFiles = findSourceFiles(rootDir);
   const fileHashes: Record<string, string> = {};
   const languageCounts: Record<string, number> = {};
+  const warnings: AnalyzerWarning[] = [];
   let skipped = 0;
 
   // Read files and filter unchanged ones (incremental)
@@ -123,7 +126,9 @@ export function analyzeTreeSitter(
     let content: string;
     try {
       content = readFileSync(file.absolutePath, 'utf-8');
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      warnings.push({ file: file.relativePath, reason: message.split('\n')[0] });
       continue;
     }
 
@@ -147,12 +152,17 @@ export function analyzeTreeSitter(
   let totalCalls = 0;
 
   for (const file of filesToProcess) {
-    const result = extractFromFile(file.relativePath, file.content, file.language);
-    extractions.set(file.relativePath, result);
-    totalCalls += result.calls.length;
+    try {
+      const result = extractFromFile(file.relativePath, file.content, file.language);
+      extractions.set(file.relativePath, result);
+      totalCalls += result.calls.length;
 
-    const langKey = file.language;
-    languageCounts[langKey] = (languageCounts[langKey] || 0) + 1;
+      const langKey = file.language;
+      languageCounts[langKey] = (languageCounts[langKey] || 0) + 1;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      warnings.push({ file: file.relativePath, reason: message.split('\n')[0] });
+    }
   }
 
   // Build graph from extractions
@@ -168,6 +178,7 @@ export function analyzeTreeSitter(
       languages: languageCounts,
     },
     fileHashes,
+    warnings,
   };
 }
 
@@ -188,12 +199,14 @@ export async function analyzeTreeSitterParallel(
       result: { nodes: [], relationships: [] },
       stats: { files: 0, symbols: 0, calls: 0, skipped: 0, languages: {} },
       fileHashes: {},
+      warnings: [],
     };
   }
 
   const sourceFiles = findSourceFiles(rootDir);
   const fileHashes: Record<string, string> = {};
   const languageCounts: Record<string, number> = {};
+  const warnings: AnalyzerWarning[] = [];
   let skipped = 0;
 
   // Read files and filter unchanged
@@ -208,7 +221,9 @@ export async function analyzeTreeSitterParallel(
     let content: string;
     try {
       content = readFileSync(file.absolutePath, 'utf-8');
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      warnings.push({ file: file.relativePath, reason: message.split('\n')[0] });
       continue;
     }
 
@@ -257,11 +272,10 @@ export async function analyzeTreeSitterParallel(
 
     const extractions = new Map<string, FileExtractionResult>();
     let totalCalls = 0;
-    let errors = 0;
 
     for (const [filePath, pr] of parseResults) {
       if (pr.error) {
-        errors++;
+        warnings.push({ file: filePath, reason: pr.error });
         continue;
       }
       extractions.set(filePath, pr.result);
@@ -275,7 +289,7 @@ export async function analyzeTreeSitterParallel(
     }
 
     const parseElapsed = Math.round(performance.now() - parseStart);
-    console.error(`[recon] Worker pool: parsed ${extractions.size} files in ${parseElapsed}ms (${errors} errors)`);
+    console.error(`[recon] Worker pool: parsed ${extractions.size} files in ${parseElapsed}ms (${warnings.length} errors)`);
 
     // Build graph from extractions
     const graphResult = buildGraphFromExtractions(extractions);
@@ -290,6 +304,7 @@ export async function analyzeTreeSitterParallel(
         languages: languageCounts,
       },
       fileHashes,
+      warnings,
     };
   } catch (err) {
     console.error(`[recon] Worker pool error: ${err}. Falling back to sequential.`);

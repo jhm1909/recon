@@ -13,7 +13,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, relative, dirname, resolve } from 'node:path';
 import { NodeType, RelationshipType, Language } from '../graph/types.js';
 import type { Node, Relationship } from '../graph/types.js';
-import type { AnalyzerResult } from './types.js';
+import type { AnalyzerResult, AnalyzerWarning } from './types.js';
 import { hashFiles } from '../utils/hash.js';
 
 // ─── Test File Detection ─────────────────────────────────────
@@ -831,6 +831,7 @@ export async function analyzeTypeScript(
   result: AnalyzerResult;
   fileHashes: Record<string, string>;
   stats: { files: number; skipped: number; components: number; functions: number };
+  warnings: AnalyzerWarning[];
 }> {
   const webAppRoot = join(projectRoot, webAppRelPath);
   const srcRoot = join(webAppRoot, 'src');
@@ -841,6 +842,7 @@ export async function analyzeTypeScript(
       result: { nodes: [], relationships: [] },
       fileHashes: {},
       stats: { files: 0, skipped: 0, components: 0, functions: 0 },
+      warnings: [],
     };
   }
 
@@ -861,6 +863,7 @@ export async function analyzeTypeScript(
   // 4. Parse and analyze each file
   const fileAnalyses = new Map<string, FileAnalysis>();
   let skippedCount = 0;
+  const warnings: AnalyzerWarning[] = [];
 
   for (const absPath of files) {
     const relPath = relative(projectRoot, absPath).replace(/\\/g, '/');
@@ -885,7 +888,7 @@ export async function analyzeTypeScript(
       fileAnalyses.set(relPath, analysis);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[recon] Warning: failed to parse ${relPath} — ${message.split('\n')[0]}`);
+      warnings.push({ file: relPath, reason: message.split('\n')[0] });
     }
   }
 
@@ -907,5 +910,6 @@ export async function analyzeTypeScript(
       components: componentCount,
       functions: functionCount,
     },
+    warnings,
   };
 }

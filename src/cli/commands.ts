@@ -117,6 +117,13 @@ export async function indexProject(
     graph.addRelationship(rel);
   }
 
+  if (tsResult.warnings.length > 0) {
+    console.error(`[recon] ${tsResult.warnings.length} TS file(s) skipped due to errors:`);
+    for (const w of tsResult.warnings) {
+      console.error(`  ${w.file}: ${w.reason}`);
+    }
+  }
+
   // Tree-sitter analysis
   const tsitterLangs = getAvailableLanguages();
   let tsitterSymbols = 0;
@@ -133,6 +140,13 @@ export async function indexProject(
     tsitterSymbols = tsitterResult.stats.symbols;
     tsitterFiles = tsitterResult.stats.files;
     tsitterHashes = tsitterResult.fileHashes;
+
+    if (tsitterResult.warnings.length > 0) {
+      console.error(`[recon] ${tsitterResult.warnings.length} tree-sitter file(s) skipped due to errors:`);
+      for (const w of tsitterResult.warnings) {
+        console.error(`  ${w.file}: ${w.reason}`);
+      }
+    }
   }
 
   // Cross-language analysis
@@ -232,6 +246,14 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
     graph.addRelationship(rel);
   }
 
+  // Print TS warnings
+  if (tsResult.warnings.length > 0) {
+    console.log(`[recon] ${tsResult.warnings.length} TS file(s) skipped due to errors:`);
+    for (const w of tsResult.warnings) {
+      console.log(`  ${w.file}: ${w.reason}`);
+    }
+  }
+
   // If incremental, carry over unchanged TS symbols from previous index
   if (previousIndex && tsResult.stats.skipped > 0) {
     const analyzedTsFiles = new Set(
@@ -286,6 +308,13 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
         `[recon] Tree-sitter: ${tsitterResult.stats.files} files, ` +
         `${tsitterResult.stats.symbols} symbols (${langBreakdown})`,
       );
+    }
+
+    if (tsitterResult.warnings.length > 0) {
+      console.log(`[recon] ${tsitterResult.warnings.length} tree-sitter file(s) skipped due to errors:`);
+      for (const w of tsitterResult.warnings) {
+        console.log(`  ${w.file}: ${w.reason}`);
+      }
     }
   }
 
