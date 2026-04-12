@@ -16,438 +16,114 @@ export interface ToolDefinition {
       items?: { type: string };
       enum?: string[];
     }>;
-    required: string[];
+    required?: string[];
   };
 }
 
-const REPO_PROPERTY = {
-  type: 'string',
-  description: 'Filter by repo name (multi-repo). Omit to search across all indexed repos.',
-} as const;
-
 export const RECON_TOOLS: ToolDefinition[] = [
   {
-    name: 'recon_packages',
-    description: `List all packages (Go) and modules (TypeScript) with their dependency relationships. High-level architecture overview.
-
-WHEN TO USE: First step when exploring the codebase. Understand which packages exist and how they depend on each other.
-AFTER THIS: Use recon_impact() to check blast radius before editing a package.`,
+    name: 'recon_map',
+    description: 'Architecture overview: tech stack, packages, entry points, health.\n\nWHEN: First time in a codebase, or need to recall architecture.\nNOT: You need details about a specific symbol (use recon_explain).\nTHEN: recon_find to locate specific symbols.',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
-        language: {
-          type: 'string',
-          description: 'Filter by language: "go", "typescript", "all" (default: "all")',
-          enum: ['go', 'typescript', 'all'],
-          default: 'all',
-        },
-        repo: REPO_PROPERTY,
+        repo: { type: 'string', description: 'Filter by repo name (multi-repo only)' },
       },
-      required: [],
     },
   },
   {
-    name: 'recon_impact',
-    description: `Analyze the blast radius of changing a code symbol. Returns affected symbols grouped by depth, plus risk assessment.
-
-WHEN TO USE: Before making code changes — especially refactoring, renaming, or modifying shared code. Shows what would break.
-AFTER THIS: Review d=1 items (WILL BREAK). Use recon_context({name}) on high-risk symbols.
-
-Depth groups:
-- d=1: WILL BREAK (direct callers/importers)
-- d=2: LIKELY AFFECTED (indirect)
-- d=3: MAY NEED TESTING (transitive)
-
-Risk levels: LOW (0-2 d1), MEDIUM (3-9), HIGH (10-19), CRITICAL (20+ or cross-app)`,
+    name: 'recon_find',
+    description: 'Smart search: exact name, wildcard (*Handler), or natural language.\n\nWHEN: Looking for a symbol, function, class, or pattern.\nNOT: You already know the symbol name and need full context (use recon_explain).\nTHEN: recon_explain for details on a result.',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
-        target: {
-          type: 'string',
-          description: 'Name of function, method, struct, or component to analyze (e.g., "Handler.GetGuild", "Button", "Middleware")',
-        },
-        direction: {
-          type: 'string',
-          description: 'upstream = what depends on this (callers/importers); downstream = what this depends on (callees/imports)',
-          enum: ['upstream', 'downstream'],
-        },
-        maxDepth: {
-          type: 'number',
-          description: 'Max relationship traversal depth (default: 3)',
-          default: 3,
-        },
-        includeTests: {
-          type: 'boolean',
-          description: 'Include test files in results (default: false)',
-          default: false,
-        },
-        relationTypes: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Filter by edge types: CALLS, IMPORTS, HAS_METHOD, IMPLEMENTS, USES_COMPONENT, CALLS_API (default: all)',
-        },
-        minConfidence: {
-          type: 'number',
-          description: 'Minimum confidence threshold 0.0-1.0 (default: 0.0)',
-          default: 0,
-        },
-        file: {
-          type: 'string',
-          description: 'Filter target by file path (substring match) to disambiguate symbols with same name',
-        },
-        repo: REPO_PROPERTY,
+        query: { type: 'string', description: 'Symbol name, pattern (*Handler), or natural language' },
+        type: { type: 'string', description: 'Filter: Function, Class, Method, Struct, Interface, etc.' },
+        language: { type: 'string', description: 'Filter by language' },
+        package: { type: 'string', description: 'Filter by package' },
+        limit: { type: 'number', description: 'Max results (default: 20)' },
       },
-      required: ['target', 'direction'],
+      required: ['query'],
     },
   },
   {
-    name: 'recon_context',
-    description: `360-degree view of a single code symbol. Shows callers, callees, imports, methods, and implementation relationships.
-
-WHEN TO USE: After recon_query or recon_impact to understand a specific symbol in depth. When you need to know all callers, callees, and dependencies.
-AFTER THIS: Use recon_impact() if planning changes.`,
+    name: 'recon_explain',
+    description: 'Full 360-degree context of a symbol: callers, callees, flows, cross-language links.\n\nWHEN: You need to understand a function/class before modifying it.\nNOT: You just need to read the source code (use Read tool).\nTHEN: recon_impact if you plan to change it.',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
-        name: {
-          type: 'string',
-          description: 'Symbol name (e.g., "Middleware", "Button", "Handler.GetGuild")',
-        },
-        file: {
-          type: 'string',
-          description: 'File path to disambiguate when multiple symbols share the same name',
-        },
-        includeSource: {
-          type: 'boolean',
-          description: 'Include symbol source code in response (default: false)',
-          default: false,
-        },
-        repo: REPO_PROPERTY,
+        name: { type: 'string', description: 'Symbol name' },
+        file: { type: 'string', description: 'File path to disambiguate if multiple matches' },
+        depth: { type: 'number', description: 'Levels of callers/callees (default: 1)' },
+        include_source: { type: 'boolean', description: 'Include source code snippet' },
       },
       required: ['name'],
     },
   },
   {
-    name: 'recon_query',
-    description: `Search the knowledge graph for symbols by name or pattern. Supports hybrid search (BM25 + semantic vector search) when embeddings are available.
-
-WHEN TO USE: When you need to find a function, struct, or component by name. Complements grep — returns structured results with dependency info. Semantic mode understands meaning, not just keywords.
-AFTER THIS: Use recon_context({name}) for 360° view of a result.`,
+    name: 'recon_impact',
+    description: 'Blast radius: what breaks if you change this symbol, including affected tests.\n\nWHEN: Before modifying any exported function or shared type.\nNOT: Just exploring (use recon_explain first).\nTHEN: Make the change, then recon_changes to verify.',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
-        query: {
-          type: 'string',
-          description: 'Symbol name or substring to search for (case-insensitive)',
-        },
-        type: {
-          type: 'string',
-          description: 'Filter by node type',
-          enum: ['Function', 'Method', 'Struct', 'Interface', 'Component', 'Type', 'Package', 'Class', 'Enum', 'Trait'],
-        },
-        package: {
-          type: 'string',
-          description: 'Filter by package/directory (e.g., "internal/auth" or "src/components/ui")',
-        },
-        language: {
-          type: 'string',
-          description: 'Filter by language',
-          enum: ['go', 'typescript', 'python', 'rust', 'java', 'c', 'cpp'],
-        },
-        semantic: {
-          type: 'boolean',
-          description: 'Enable semantic search (BM25 + vector embeddings). Default: true when embeddings available.',
-          default: true,
-        },
-        limit: {
-          type: 'number',
-          description: 'Max results to return (default: 20)',
-          default: 20,
-        },
-        repo: REPO_PROPERTY,
+        target: { type: 'string', description: 'Symbol name to analyze' },
+        direction: { type: 'string', enum: ['upstream', 'downstream'], description: 'upstream = who calls this, downstream = what this calls (default: upstream)' },
+        maxDepth: { type: 'number', description: 'Max traversal depth (default: 3)' },
+        file: { type: 'string', description: 'File path to disambiguate' },
       },
-      required: ['query'],
+      required: ['target'],
     },
   },
   {
-    name: 'recon_detect_changes',
-    description: `Analyze uncommitted git changes and find affected symbols and their dependents. Maps git diff hunks to indexed symbols, then traces impact through the dependency graph.
-
-WHEN TO USE: Before committing — to understand what your changes affect. Pre-commit review, PR preparation.
-AFTER THIS: Review affected symbols. Use recon_context() on high-risk items.`,
+    name: 'recon_changes',
+    description: 'Git diff → affected symbols → risk assessment → affected tests.\n\nWHEN: Before commit, or reviewing a PR.\nNOT: No changes have been made yet.\nTHEN: Fix issues, then commit.',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
-        scope: {
-          type: 'string',
-          description: 'What to analyze: "unstaged" (working tree), "staged" (git add), "all" (both), "branch" (compare with base)',
-          enum: ['unstaged', 'staged', 'all', 'branch'],
-          default: 'all',
-        },
-        base: {
-          type: 'string',
-          description: 'Base branch/commit for "branch" scope (default: "main")',
-          default: 'main',
-        },
-        repo: REPO_PROPERTY,
+        scope: { type: 'string', enum: ['unstaged', 'staged', 'branch', 'commit'], description: 'What to analyze (default: unstaged)' },
+        base: { type: 'string', description: 'Base branch for branch/commit scope' },
+        include_diagram: { type: 'boolean', description: 'Include Mermaid diagram (default: false)' },
       },
-      required: [],
-    },
-  },
-  {
-    name: 'recon_api_map',
-    description: `Show the full API route map: HTTP endpoint → Go handler → TypeScript consumers. Cross-language traceability.
-
-WHEN TO USE: When you need to understand how frontend calls map to backend handlers, find which TS files call a specific API endpoint, or audit API coverage.
-AFTER THIS: Use recon_context({name}) on a specific handler for full dependency info.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        method: {
-          type: 'string',
-          description: 'Filter by HTTP method: GET, POST, PUT, PATCH, DELETE',
-          enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-        },
-        pattern: {
-          type: 'string',
-          description: 'Filter by URL pattern substring (e.g., "guilds", "admin")',
-        },
-        handler: {
-          type: 'string',
-          description: 'Filter by handler name substring (e.g., "GetGuild")',
-        },
-        repo: REPO_PROPERTY,
-      },
-      required: [],
     },
   },
   {
     name: 'recon_rename',
-    description: `Multi-file coordinated rename using the knowledge graph. Finds all references via graph relationships (callers, importers, component users) and generates an edit plan with confidence tags.
-
-WHEN TO USE: Renaming a function, struct, component, or method across the codebase. Safer than find-and-replace because it understands the call graph.
-AFTER THIS: Review the edit plan. Run with dry_run: false to apply. Then run recon_detect_changes() to verify.
-
-Each edit is tagged:
-- "graph": found via knowledge graph relationship (high confidence, safe to accept)
-- "text_search": found via name matching (lower confidence, review carefully)`,
+    description: 'Graph-aware safe rename across all files. Always dry_run first.\n\nWHEN: Renaming a symbol and want to catch all references.\nNOT: Simple text replacement in one file (use Edit tool).\nTHEN: Review plan, then run with dry_run: false.',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
-        symbol_name: {
-          type: 'string',
-          description: 'Current name of the symbol to rename',
-        },
-        new_name: {
-          type: 'string',
-          description: 'The new name for the symbol',
-        },
-        file: {
-          type: 'string',
-          description: 'File path substring to disambiguate when multiple symbols share a name',
-        },
-        dry_run: {
-          type: 'boolean',
-          description: 'Preview edits without applying (default: true)',
-          default: true,
-        },
-        repo: REPO_PROPERTY,
+        symbol: { type: 'string', description: 'Current symbol name' },
+        new_name: { type: 'string', description: 'New name' },
+        file: { type: 'string', description: 'File path to disambiguate' },
+        dry_run: { type: 'boolean', description: 'Preview only (default: true)' },
       },
-      required: ['symbol_name', 'new_name'],
-    },
-  },
-  {
-    name: 'recon_query_graph',
-    description: `Execute a simplified Cypher query against the Recon knowledge graph. Returns results as a markdown table.
-
-WHEN TO USE: Complex structural queries that recon_query can't answer — e.g., "find all structs with methods", "find all callers of functions in package X", "list classes that extend another class".
-AFTER THIS: Use recon_context({name}) on result symbols for deeper context.
-
-SUPPORTED SYNTAX:
-  MATCH (n:Type) WHERE n.name = 'X' RETURN n
-  MATCH (a)-[:EDGE_TYPE]->(b) WHERE a.name = 'X' RETURN b.name, b.file
-  MATCH (s:Struct)-[:HAS_METHOD]->(m:Method) RETURN s.name, m.name
-
-NODE TYPES: Package, File, Function, Method, Struct, Interface, Module, Component, Type, Class, Enum, Trait
-EDGE TYPES: CONTAINS, DEFINES, CALLS, IMPORTS, HAS_METHOD, IMPLEMENTS, USES_COMPONENT, CALLS_API, EXTENDS
-
-WHERE operators: =, <>, CONTAINS, STARTS WITH (all case-insensitive)
-NODE properties: id, type, name, file, startLine, endLine, language, package, exported, repo
-
-EXAMPLES:
-• Find all classes:
-  MATCH (c:Class) RETURN c.name, c.file
-• Find callers of a function:
-  MATCH (a)-[:CALLS]->(b:Function) WHERE b.name = 'main' RETURN a.name, a.file
-• Find methods of a struct:
-  MATCH (s:Struct)-[:HAS_METHOD]->(m:Method) WHERE s.name = 'Config' RETURN m.name, m.file
-• Find class inheritance:
-  MATCH (child:Class)-[:EXTENDS]->(parent:Class) RETURN child.name, parent.name
-• Find exported functions in a package:
-  MATCH (f:Function) WHERE f.package CONTAINS 'auth' AND f.exported = 'true' RETURN f.name, f.file`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Simplified Cypher query (MATCH...WHERE...RETURN...LIMIT)',
-        },
-        limit: {
-          type: 'number',
-          description: 'Max rows to return (default: 50)',
-          default: 50,
-        },
-        repo: REPO_PROPERTY,
-      },
-      required: ['query'],
-    },
-  },
-  {
-    name: 'recon_list_repos',
-    description: `List all indexed repositories with their stats (node count, relationship count, index time, git info).
-
-WHEN TO USE: When working with multi-repo setups. Discover which repos are indexed and their sizes.
-AFTER THIS: Use any tool with repo parameter to filter by a specific repo.`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'recon_processes',
-    description: `Detect and list execution flows by tracing call chains from entry points (HTTP handlers, exported functions). Shows the full call chain with complexity ranking.
-
-WHEN TO USE: When you need to understand execution flows, trace request handling paths, or identify the most complex code paths in the codebase.
-AFTER THIS: Use READ recon://process/{name} for a detailed step-by-step trace of a specific flow.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: {
-          type: 'number',
-          description: 'Max processes to return (default: 20)',
-          default: 20,
-        },
-        filter: {
-          type: 'string',
-          description: 'Filter processes by name (substring match)',
-        },
-        repo: REPO_PROPERTY,
-      },
-      required: [],
-    },
-  },
-  {
-    name: 'recon_augment',
-    description: `Quick context injection for a symbol. Returns callers, callees, process participation, community, and blast radius warning in a compact format.
-
-WHEN TO USE: When you want rapid graph context for a symbol without the full recon_context output. Useful for hook integration and quick lookups.
-AFTER THIS: Use recon_context() for full detail, or recon_impact() for blast radius analysis.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        pattern: {
-          type: 'string',
-          description: 'Symbol name to look up (e.g., "buildGraph", "handleLogin")',
-        },
-        repo: REPO_PROPERTY,
-      },
-      required: ['pattern'],
-    },
-  },
-  {
-    name: 'recon_watcher_status',
-    description: `Get the live status of the file watcher. Shows whether the watcher is active, which directories are being monitored, total files updated, last update details, pending queue, and recent errors.
-
-WHEN TO USE: When you want to verify the watcher is running, check if recent file changes have been processed, or diagnose file watching issues.
-AFTER THIS: Use recon_query() or recon_context() to inspect the updated symbols.`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
+      required: ['symbol', 'new_name'],
     },
   },
   {
     name: 'recon_export',
-    description: `Export the knowledge graph as a Mermaid flowchart or Graphviz DOT diagram. Perfect for generating architecture diagrams, PR visualizations, and documentation.
-
-WHEN TO USE: When the user asks for a visual diagram, architecture map, or wants to see the graph structure in a shareable format.
-OUTPUT: Returns Mermaid (pasteable in GitHub Markdown) or DOT (render with graphviz).
-FILTERS: Use package, symbol (ego graph with depth), type, and edges to focus the output.`,
+    description: 'Generate Mermaid diagram of package/symbol/file relationships.\n\nWHEN: Need visual representation for documentation or understanding.\nNOT: Just need a list of packages (use recon_map).\nTHEN: Paste diagram in PR or docs.',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
-        format: {
-          type: 'string',
-          description: 'Output format: "mermaid" or "dot" (default: mermaid)',
-          enum: ['mermaid', 'dot'],
-        },
-        package: {
-          type: 'string',
-          description: 'Filter by package name (e.g., "mcp", "search")',
-        },
-        symbol: {
-          type: 'string',
-          description: 'Show ego graph centered on this symbol (e.g., "handleQuery")',
-        },
-        depth: {
-          type: 'number',
-          description: 'Max hops from symbol (default: 2). Only used with symbol.',
-        },
-        type: {
-          type: 'string',
-          description: 'Filter by node types, comma-separated (e.g., "Function,Interface")',
-        },
-        edges: {
-          type: 'string',
-          description: 'Filter by edge types, comma-separated (e.g., "CALLS,EXTENDS")',
-        },
-        limit: {
-          type: 'number',
-          description: 'Max nodes to include (default: 50)',
-        },
-        direction: {
-          type: 'string',
-          description: 'Graph direction: "TD" (top-down) or "LR" (left-right)',
-          enum: ['TD', 'LR'],
-        },
-        repo: REPO_PROPERTY,
+        target: { type: 'string', description: 'Package or symbol name for focused view' },
+        scope: { type: 'string', enum: ['package', 'symbol', 'file'], description: 'What to diagram' },
+        depth: { type: 'number', description: 'Traversal depth (default: 2)' },
+        direction: { type: 'string', enum: ['callers', 'callees', 'both'], description: 'Direction (default: both)' },
+        limit: { type: 'number', description: 'Max nodes (default: 30)' },
       },
-      required: [],
     },
   },
   {
-    name: 'recon_pr_review',
-    description: `Graph-aware PR review. Analyzes code changes using the dependency graph to assess blast radius, risk level, affected execution flows, and review priorities.
-
-Unlike text-based review (Copilot), this uses structural analysis — it knows which functions call the changed code, which execution flows break, and which communities are affected.
-
-OUTPUT: Markdown report with per-file risk (🔴🟡🟢), affected symbols, execution flows, architecture diagram, and review priorities.
-
-WHEN TO USE: Before merging a PR, after making significant changes, or when the user asks "what did I break?" or "is this safe to merge?"`,
+    name: 'recon_rules',
+    description: 'Code quality analysis via knowledge graph: dead code, circular deps, unused exports.\n\nWHEN: Reviewing code quality, cleaning up, or auditing architecture.\nNOT: Looking for a specific symbol (use recon_find).\nTHEN: recon_explain on flagged items for context.',
     inputSchema: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
-        scope: {
-          type: 'string',
-          description: 'Diff scope: "staged", "unstaged", "branch", "all" (default: all)',
-          enum: ['staged', 'unstaged', 'branch', 'all'],
-        },
-        base: {
-          type: 'string',
-          description: 'Base branch for branch diff (default: main)',
-        },
-        include_diagram: {
-          type: 'boolean',
-          description: 'Include Mermaid architecture diagram (default: true)',
-        },
-        include_tests: {
-          type: 'boolean',
-          description: 'Include test files in analysis (default: false)',
-        },
-        repo: REPO_PROPERTY,
+        rule: { type: 'string', enum: ['dead_code', 'unused_exports', 'circular_deps', 'large_files', 'orphans'], description: 'Specific rule to check (omit to run all)' },
+        package: { type: 'string', description: 'Filter by package' },
+        language: { type: 'string', description: 'Filter by language' },
       },
-      required: [],
     },
   },
 ];
