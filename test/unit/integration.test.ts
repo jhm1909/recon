@@ -12,6 +12,11 @@ import { BM25Index } from '../../src/search/bm25.js';
 import { detectProcesses } from '../../src/graph/process.js';
 import { exportGraph } from '../../src/export/exporter.js';
 import { formatReview } from '../../src/review/reviewer.js';
+import { handleToolCall } from '../../src/mcp/handlers.js';
+import { SqliteStore } from '../../src/storage/sqlite.js';
+import { mkdtemp, rm } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 // ─── Build a realistic mini-codebase graph ──────────────────────
 
@@ -179,13 +184,13 @@ describe('Integration: Full Pipeline', () => {
     expect(output).toContain('subgraph');
   });
 
-  it('graph → export → dot output valid', () => {
+  it('graph → export → mermaid is always the format', () => {
     const graph = buildRealisticGraph();
-    const output = exportGraph(graph, { format: 'dot' });
+    const output = exportGraph(graph, { format: 'mermaid' });
 
-    expect(output).toContain('digraph recon');
+    expect(output).toContain('graph TD');
     expect(output).toContain('validateToken');
-    expect(output).toContain('->');
+    expect(output).toContain('-->');
   });
 
   it('graph → review → no changes produces clean output', () => {
@@ -249,5 +254,43 @@ describe('Integration: Full Pipeline', () => {
 
     expect(fromDisk.length).toBe(original.length);
     expect(fromDisk[0].nodeId).toBe(original[0].nodeId);
+  });
+
+  it('full pipeline: graph → SQLite → search', async () => {
+    const graph = buildRealisticGraph();
+    const tmpDir = await mkdtemp(join(tmpdir(), 'recon-int-'));
+    let store: SqliteStore | undefined;
+    try {
+      store = new SqliteStore(tmpDir);
+      // Insert the graph built by the test into SQLite
+      for (const [, node] of graph.nodes) {
+        store.insertNode(node);
+      }
+      for (const rel of graph.allRelationships()) {
+        store.insertRelationship(rel);
+      }
+
+      expect(store.nodeCount).toBe(graph.nodeCount);
+      expect(store.relationshipCount).toBe(graph.relationshipCount);
+
+      // FTS5 search -- tokenizer splits camelCase, so "handleLogin" becomes "handle login"
+      const results = store.search('handle');
+      expect(results.length).toBeGreaterThan(0);
+    } finally {
+      // Close before cleanup to release file locks (critical on Windows)
+      store?.close();
+      try {
+        await rm(tmpDir, { recursive: true, force: true });
+      } catch {
+        // Best-effort cleanup -- Windows may still hold WAL/SHM locks briefly
+      }
+    }
+  });
+
+  it('recon_rules detects issues in graph', async () => {
+    const graph = buildRealisticGraph();
+    const result = await handleToolCall('recon_rules', { rule: 'dead_code' }, graph);
+    expect(result).toBeDefined();
+    expect(typeof result).toBe('string');
   });
 });

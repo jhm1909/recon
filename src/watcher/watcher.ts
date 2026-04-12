@@ -19,6 +19,7 @@ import { NodeType, RelationshipType, Language } from '../graph/types.js';
 import { extractFromFile } from '../analyzers/tree-sitter/extractor.js';
 import { getLanguageForFile, isLanguageAvailable } from '../analyzers/tree-sitter/parser.js';
 import { saveIndex } from '../storage/store.js';
+import { SqliteStore } from '../storage/sqlite.js';
 import type { IndexMeta } from '../storage/types.js';
 import {
   analyzeTypeScriptFile,
@@ -103,6 +104,7 @@ export class ReconWatcher {
     private debounceMs = 1500,
     private customIgnore: string[] = [],
     private projectRoot?: string,
+    private store?: SqliteStore,
   ) {}
 
   /**
@@ -261,6 +263,9 @@ export class ReconWatcher {
         if (removed > 0) {
           console.error(`[recon:watch] Removed ${removed} nodes (file deleted: ${relPath})`);
         }
+        if (this.store) {
+          this.store.removeNodesByFile(relPath);
+        }
         return;
       }
 
@@ -268,6 +273,19 @@ export class ReconWatcher {
         this.surgicalUpdateTS(absPath, relPath, repoName, project.dir);
       } else if (TREE_SITTER_EXTENSIONS.has(ext)) {
         this.surgicalUpdateTreeSitter(absPath, relPath, repoName);
+      }
+
+      // Persist file changes to SQLite if store is available
+      if (this.store) {
+        this.store.removeNodesByFile(relPath);
+        const fileNodes = [...this.graph.nodes.values()].filter(n => n.file === relPath);
+        if (fileNodes.length > 0) this.store.insertNodes(fileNodes);
+
+        const nodeIds = new Set(fileNodes.map(n => n.id));
+        const rels = [...this.graph.allRelationships()].filter(
+          r => nodeIds.has(r.sourceId) || nodeIds.has(r.targetId),
+        );
+        if (rels.length > 0) this.store.insertRelationships(rels);
       }
 
       const elapsed = Math.round(performance.now() - startTime);

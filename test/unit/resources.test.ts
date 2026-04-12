@@ -138,10 +138,6 @@ function buildMockGraph(): KnowledgeGraph {
 // ─── parseUri ───────────────────────────────────────────────────
 
 describe('parseUri', () => {
-  it('parses recon://packages', () => {
-    expect(parseUri('recon://packages')).toEqual({ resourceType: 'packages' });
-  });
-
   it('parses recon://stats', () => {
     expect(parseUri('recon://stats')).toEqual({ resourceType: 'stats' });
   });
@@ -167,6 +163,14 @@ describe('parseUri', () => {
     });
   });
 
+  it('throws on recon://packages (removed)', () => {
+    expect(() => parseUri('recon://packages')).toThrow('Unknown resource URI');
+  });
+
+  it('throws on recon://process (removed)', () => {
+    expect(() => parseUri('recon://process/myflow')).toThrow('Unknown resource URI');
+  });
+
   it('throws on unknown URI', () => {
     expect(() => parseUri('recon://unknown')).toThrow('Unknown resource URI');
   });
@@ -181,8 +185,7 @@ describe('parseUri', () => {
 describe('resource definitions', () => {
   it('returns static resource definitions', () => {
     const defs = getResourceDefinitions();
-    expect(defs.length).toBe(2);
-    expect(defs.map(d => d.uri)).toContain('recon://packages');
+    expect(defs.length).toBe(1);
     expect(defs.map(d => d.uri)).toContain('recon://stats');
     for (const d of defs) {
       expect(d.name).toBeTruthy();
@@ -191,59 +194,26 @@ describe('resource definitions', () => {
     }
   });
 
+  it('does not include removed recon://packages resource', () => {
+    const defs = getResourceDefinitions();
+    expect(defs.map(d => d.uri)).not.toContain('recon://packages');
+  });
+
   it('returns resource templates', () => {
     const templates = getResourceTemplates();
-    expect(templates.length).toBe(3);
+    expect(templates.length).toBe(2);
     expect(templates.map(t => t.uriTemplate)).toContain('recon://symbol/{name}');
     expect(templates.map(t => t.uriTemplate)).toContain('recon://file/{path}');
-    expect(templates.map(t => t.uriTemplate)).toContain('recon://process/{name}');
     for (const t of templates) {
       expect(t.name).toBeTruthy();
       expect(t.description).toBeTruthy();
       expect(t.mimeType).toBe('text/yaml');
     }
   });
-});
 
-// ─── readResource: packages ─────────────────────────────────────
-
-describe('readResource: packages', () => {
-  let graph: KnowledgeGraph;
-
-  beforeEach(() => {
-    graph = buildMockGraph();
-  });
-
-  it('lists all packages and modules', () => {
-    const output = readResource('recon://packages', graph);
-    expect(output).toContain('package_count: 3');
-    expect(output).toContain('auth');
-    expect(output).toContain('user');
-    expect(output).toContain('web');
-  });
-
-  it('includes import paths', () => {
-    const output = readResource('recon://packages', graph);
-    expect(output).toContain('myapp/internal/auth');
-  });
-
-  it('shows dependency counts', () => {
-    const output = readResource('recon://packages', graph);
-    // auth imports user, so auth has imports: 1
-    expect(output).toContain('imports: 1');
-    // user is imported by auth, so user has imported_by: 1
-    expect(output).toContain('imported_by: 1');
-  });
-
-  it('shows file count when available', () => {
-    const output = readResource('recon://packages', graph);
-    expect(output).toContain('files: 2'); // auth has 2 files
-  });
-
-  it('handles empty graph', () => {
-    const empty = new KnowledgeGraph();
-    const output = readResource('recon://packages', empty);
-    expect(output).toContain('packages: []');
+  it('does not include removed recon://process template', () => {
+    const templates = getResourceTemplates();
+    expect(templates.map(t => t.uriTemplate)).not.toContain('recon://process/{name}');
   });
 });
 

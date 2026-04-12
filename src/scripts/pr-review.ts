@@ -24,7 +24,7 @@ async function main(): Promise<void> {
   let detectResult: string;
   try {
     detectResult = await handleToolCall(
-      'recon_detect_changes',
+      'recon_changes',
       { scope: 'branch', base },
       graph,
       projectRoot,

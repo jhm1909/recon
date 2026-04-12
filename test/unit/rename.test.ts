@@ -356,7 +356,7 @@ describe('recon_rename handler', () => {
 
   it('works via handleToolCall', async () => {
     const result = await handleToolCall('recon_rename', {
-      symbol_name: 'DecodeJWT',
+      symbol: 'DecodeJWT',
       new_name: 'ParseJWT',
     }, graph);
 
@@ -365,16 +365,18 @@ describe('recon_rename handler', () => {
     expect(result).toContain('DRY RUN');
   });
 
-  it('returns error for missing symbol_name', async () => {
-    await expect(
-      handleToolCall('recon_rename', { new_name: 'Foo' }, graph),
-    ).rejects.toThrow("'symbol_name' is required");
+  it('returns error for missing symbol', async () => {
+    const result = await handleToolCall('recon_rename', { new_name: 'Foo' }, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('invalid_parameter');
+    expect(parsed.parameter).toBe('symbol');
   });
 
   it('returns error for missing new_name', async () => {
-    await expect(
-      handleToolCall('recon_rename', { symbol_name: 'Foo' }, graph),
-    ).rejects.toThrow("'new_name' is required");
+    const result = await handleToolCall('recon_rename', { symbol: 'Foo' }, graph);
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('invalid_parameter');
+    expect(parsed.parameter).toBe('new_name');
   });
 
   it('returns disambiguation for ambiguous symbols', async () => {
@@ -387,16 +389,17 @@ describe('recon_rename handler', () => {
     }));
 
     const result = await handleToolCall('recon_rename', {
-      symbol_name: 'ValidateToken',
+      symbol: 'ValidateToken',
       new_name: 'CheckToken',
     }, graph);
 
-    expect(result).toContain('Multiple symbols');
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBe('ambiguous_symbol');
   });
 
   it('defaults to dry_run true', async () => {
     const result = await handleToolCall('recon_rename', {
-      symbol_name: 'DecodeJWT',
+      symbol: 'DecodeJWT',
       new_name: 'ParseJWT',
     }, graph);
     expect(result).toContain('DRY RUN');

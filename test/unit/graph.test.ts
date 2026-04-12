@@ -303,6 +303,17 @@ describe('KnowledgeGraph', () => {
     expect(restored.returnType).toBe('error');
   });
 
+  // ─── isTest flag ─────────────────────────────────────────────
+
+  it('stores isTest flag on nodes', () => {
+    const graph = new KnowledgeGraph();
+    const node = makeNode('ts:func:a', 'testFunc', { isTest: true });
+    graph.addNode(node);
+    const result = graph.getNode('ts:func:a');
+    expect(result).toBeDefined();
+    expect(result!.isTest).toBe(true);
+  });
+
   // ─── buildAdjacencyIndex ────────────────────────────────────
 
   it('buildAdjacencyIndex rebuilds from scratch', () => {

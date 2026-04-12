@@ -316,8 +316,8 @@ describe('getProcess', () => {
 
 // ─── Handler Integration Tests ──────────────────────────────────
 
-describe('recon_processes handler', () => {
-  it('returns formatted process list', async () => {
+describe('recon_explain shows execution flows', () => {
+  it('includes execution flows for entry points', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
@@ -329,14 +329,12 @@ describe('recon_processes handler', () => {
     }));
     g.addRelationship(makeRel('h1', 's1'));
 
-    const result = await handleToolCall('recon_processes', {}, g);
-    expect(result).toContain('# Execution Flows');
-    expect(result).toContain('HandleRequest');
-    expect(result).toContain('Steps');
-    expect(result).toContain('Complexity');
+    const result = await handleToolCall('recon_explain', { name: 'HandleRequest' }, g);
+    expect(result).toContain('# Context: HandleRequest');
+    expect(result).toContain('Execution Flows');
   });
 
-  it('respects filter param', async () => {
+  it('includes callees section', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
@@ -344,64 +342,27 @@ describe('recon_processes handler', () => {
     g.addNode(makeNode('s1', 'FindUser', { file: 'service/user.go' }));
     g.addRelationship(makeRel('h1', 's1'));
 
-    g.addNode(makeNode('h2', 'GetOrder', { file: 'handler/order.go' }));
-    g.addNode(makeNode('s2', 'FindOrder', { file: 'service/order.go' }));
-    g.addRelationship(makeRel('h2', 's2'));
-
-    const result = await handleToolCall('recon_processes', { filter: 'User' }, g);
-    expect(result).toContain('GetUser');
-    expect(result).not.toContain('GetOrder');
+    const result = await handleToolCall('recon_explain', { name: 'GetUser' }, g);
+    expect(result).toContain('FindUser');
+    expect(result).toContain('Callees');
   });
 
-  it('returns empty state message when no flows', async () => {
+  it('shows no execution flows for isolated nodes', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
     g.addNode(makeNode('f1', 'Isolated'));
 
-    const result = await handleToolCall('recon_processes', {}, g);
-    expect(result).toContain('No execution flows detected');
+    const result = await handleToolCall('recon_explain', { name: 'Isolated' }, g);
+    expect(result).toContain('Execution Flows (0)');
   });
 });
 
 // ─── Resource Tests ──────────────────────────────────────────────
 
-describe('recon://process/{name} resource', () => {
-  it('returns process trace as YAML', async () => {
-    const { readResource } = await import('../../src/mcp/resources.js');
-
-    const g = new KnowledgeGraph();
-    g.addNode(makeNode('h1', 'HandleRequest', {
-      file: 'handler/api.go',
-      package: 'handler',
-    }));
-    g.addNode(makeNode('s1', 'DoWork', {
-      file: 'service/work.go',
-      package: 'service',
-    }));
-    g.addRelationship(makeRel('h1', 's1'));
-
-    const result = readResource('recon://process/HandleRequest', g);
-    expect(result).toContain('name: "HandleRequest"');
-    expect(result).toContain('complexity:');
-    expect(result).toContain('steps:');
-    expect(result).toContain('DoWork');
-  });
-
-  it('returns error for unknown process', async () => {
-    const { readResource } = await import('../../src/mcp/resources.js');
-
-    const g = new KnowledgeGraph();
-    const result = readResource('recon://process/DoesNotExist', g);
-    expect(result).toContain('error:');
-    expect(result).toContain('not found');
-  });
-
-  it('parseUri handles process URIs', async () => {
+describe('recon://process/{name} resource (removed in v6)', () => {
+  it('recon://process URI throws Unknown resource URI (resource removed)', async () => {
     const { parseUri } = await import('../../src/mcp/resources.js');
-
-    const parsed = parseUri('recon://process/Handler.GetUser');
-    expect(parsed.resourceType).toBe('process');
-    expect(parsed.param).toBe('Handler.GetUser');
+    expect(() => parseUri('recon://process/Handler.GetUser')).toThrow('Unknown resource URI');
   });
 });

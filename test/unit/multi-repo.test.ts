@@ -186,49 +186,30 @@ describe('multi-repo handler filtering', () => {
     }
   });
 
-  it('recon_query returns all nodes without repo filter', async () => {
-    const result = await handleToolCall('recon_query', { query: 'Main' }, graph);
+  it('recon_find returns all nodes without repo filter', async () => {
+    const result = await handleToolCall('recon_find', { query: '*Main' }, graph);
     expect(result).toContain('backendMain');
     expect(result).toContain('frontendMain');
   });
 
-  it('recon_query filters by repo', async () => {
-    const result = await handleToolCall('recon_query', { query: 'Main', repo: 'backend' }, graph);
-    expect(result).toContain('backendMain');
-    expect(result).not.toContain('frontendMain');
-  });
-
-  it('recon_context filters by repo', async () => {
-    const result = await handleToolCall('recon_context', {
+  it('recon_explain works with specific node', async () => {
+    const result = await handleToolCall('recon_explain', {
       name: 'backendMain',
-      repo: 'backend',
     }, graph);
     expect(result).toContain('backendMain');
     expect(result).toContain('# Context:');
   });
 
-  it('recon_impact filters by repo', async () => {
+  it('recon_impact finds upstream callers', async () => {
     const result = await handleToolCall('recon_impact', {
       target: 'backendHelper',
       direction: 'upstream',
-      repo: 'backend',
     }, graph);
     expect(result).toContain('backendMain');
-    expect(result).not.toContain('frontendMain');
-  });
-
-  it('recon_query_graph filters by repo', async () => {
-    const result = await handleToolCall('recon_query_graph', {
-      query: "MATCH (f:Function) RETURN f.name",
-      repo: 'backend',
-    }, graph);
-    expect(result).toContain('backendMain');
-    expect(result).toContain('backendHelper');
-    expect(result).not.toContain('frontendMain');
   });
 });
 
-describe('recon_list_repos handler', () => {
+describe('listRepos storage function', () => {
   let tempDir: string;
 
   beforeEach(async () => {
@@ -239,9 +220,9 @@ describe('recon_list_repos handler', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  it('returns empty message when no repos indexed', async () => {
-    const result = await handleToolCall('recon_list_repos', {}, new KnowledgeGraph(), tempDir);
-    expect(result).toContain('No indexed repos found');
+  it('returns empty list when no repos indexed', async () => {
+    const repos = await listRepos(tempDir);
+    expect(repos.length).toBe(0);
   });
 
   it('lists repos with stats', async () => {
@@ -251,11 +232,10 @@ describe('recon_list_repos handler', () => {
       gitCommit: 'def5678',
     }), 'myrepo');
 
-    const result = await handleToolCall('recon_list_repos', {}, new KnowledgeGraph(), tempDir);
-    expect(result).toContain('myrepo');
-    expect(result).toContain('develop');
-    expect(result).toContain('def5678');
-    expect(result).toContain('1 repo(s)');
+    const repos = await listRepos(tempDir);
+    expect(repos.length).toBeGreaterThanOrEqual(1);
+    const names = repos.map(r => r.name);
+    expect(names).toContain('myrepo');
   });
 });
 

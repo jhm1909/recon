@@ -1,7 +1,7 @@
 /**
- * Graph Exporter — Mermaid and DOT format output
+ * Graph Exporter — Mermaid format output
  *
- * Converts Recon's KnowledgeGraph into Mermaid or Graphviz DOT
+ * Converts Recon's KnowledgeGraph into Mermaid
  * for use in PRs, docs, README, and architecture diagrams.
  */
 
@@ -11,7 +11,7 @@ import type { KnowledgeGraph } from '../graph/graph.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
-export type ExportFormat = 'mermaid' | 'dot';
+export type ExportFormat = 'mermaid';
 
 export interface ExportOptions {
   format: ExportFormat;
@@ -43,8 +43,8 @@ const NODE_COLORS: Record<NodeType, string> = {
 };
 
 const NODE_EMOJI: Record<NodeType, string> = {
-  [NodeType.Function]: 'ƒ',
-  [NodeType.Method]: 'ƒ',
+  [NodeType.Function]: 'f',
+  [NodeType.Method]: 'f',
   [NodeType.Interface]: '◆',
   [NodeType.Class]: '●',
   [NodeType.Component]: '◇',
@@ -238,110 +238,14 @@ export function toMermaid(
   return lines.join('\n');
 }
 
-// ─── DOT Generator ──────────────────────────────────────────────
-
-/**
- * Sanitize node name for DOT IDs.
- */
-function dotId(id: string): string {
-  return `"${id.replace(/"/g, '\\"')}"`;
-}
-
-/**
- * Generate Graphviz DOT from filtered graph.
- */
-export function toDot(
-  nodes: Node[],
-  rels: Relationship[],
-  direction: 'TD' | 'LR' = 'LR',
-): string {
-  if (nodes.length === 0) return 'digraph recon {\n  empty [label="No nodes match filter"];\n}';
-
-  const rankdir = direction === 'TD' ? 'TB' : 'LR';
-  const lines: string[] = [
-    'digraph recon {',
-    `  rankdir=${rankdir};`,
-    '  node [shape=box, style="filled,rounded", fontname="Inter", fontsize=11];',
-    '  edge [fontname="Inter", fontsize=9, color="#94a3b8"];',
-    '',
-  ];
-
-  // Group by package → cluster subgraphs
-  const packages = new Map<string, Node[]>();
-  for (const node of nodes) {
-    const pkg = node.package || 'root';
-    if (!packages.has(pkg)) packages.set(pkg, []);
-    packages.get(pkg)!.push(node);
-  }
-
-  let clusterIdx = 0;
-  for (const [pkg, pkgNodes] of packages) {
-    lines.push(`  subgraph cluster_${clusterIdx++} {`);
-    lines.push(`    label="${pkg}";`);
-    lines.push('    style=rounded;');
-    lines.push('    color="#475569";');
-    lines.push('    fontcolor="#94a3b8";');
-    lines.push('    fontname="Inter";');
-    lines.push('');
-
-    for (const node of pkgNodes) {
-      const color = NODE_COLORS[node.type] || '#94a3b8';
-      const shape = (node.type === NodeType.Interface || node.type === NodeType.Trait)
-        ? 'ellipse' : 'box';
-      lines.push(`    ${dotId(node.id)} [label="${node.name} (${node.type})", fillcolor="${color}", shape=${shape}];`);
-    }
-    lines.push('  }');
-    lines.push('');
-  }
-
-  // Edges
-  for (const rel of rels) {
-    const src = dotId(rel.sourceId);
-    const tgt = dotId(rel.targetId);
-
-    switch (rel.type) {
-      case RelationshipType.CALLS:
-        lines.push(`  ${src} -> ${tgt} [label="CALLS"];`);
-        break;
-      case RelationshipType.CALLS_API:
-        lines.push(`  ${src} -> ${tgt} [label="CALLS_API", style=bold, color="#ef4444"];`);
-        break;
-      case RelationshipType.EXTENDS:
-        lines.push(`  ${src} -> ${tgt} [label="EXTENDS", style=dashed, color="#a78bfa"];`);
-        break;
-      case RelationshipType.IMPLEMENTS:
-        lines.push(`  ${src} -> ${tgt} [label="IMPLEMENTS", style=dotted, color="#a78bfa"];`);
-        break;
-      case RelationshipType.IMPORTS:
-        lines.push(`  ${src} -> ${tgt} [label="IMPORTS", color="#60a5fa"];`);
-        break;
-      case RelationshipType.HAS_METHOD:
-        lines.push(`  ${src} -> ${tgt} [label="HAS_METHOD", style=dotted];`);
-        break;
-      default:
-        lines.push(`  ${src} -> ${tgt};`);
-    }
-  }
-
-  lines.push('}');
-  return lines.join('\n');
-}
-
 // ─── Main Export Function ───────────────────────────────────────
 
 /**
- * Export the knowledge graph in the specified format.
+ * Export the knowledge graph in Mermaid format.
  */
 export function exportGraph(graph: KnowledgeGraph, options: ExportOptions): string {
   const { nodes, rels } = filterGraph(graph, options);
-  const direction = options.direction ?? (options.format === 'dot' ? 'LR' : 'TD');
+  const direction = options.direction ?? 'TD';
 
-  switch (options.format) {
-    case 'mermaid':
-      return toMermaid(nodes, rels, direction);
-    case 'dot':
-      return toDot(nodes, rels, direction);
-    default:
-      throw new Error(`Unsupported export format: ${options.format}`);
-  }
+  return toMermaid(nodes, rels, direction);
 }

@@ -216,27 +216,27 @@ describe('community detection — label propagation', () => {
 });
 
 describe('community info in handlers', () => {
-  it('recon_context includes community field', async () => {
+  it('recon_explain includes community field', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
     g.addNode(makeNode('f1', 'MyFunc', { community: 'internal/auth' }));
 
-    const result = await handleToolCall('recon_context', { name: 'MyFunc' }, g);
+    const result = await handleToolCall('recon_explain', { name: 'MyFunc' }, g);
     expect(result).toContain('**Community:** internal/auth');
   });
 
-  it('recon_context omits community when not set', async () => {
+  it('recon_explain omits community when not set', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
     g.addNode(makeNode('f1', 'MyFunc'));
 
-    const result = await handleToolCall('recon_context', { name: 'MyFunc' }, g);
+    const result = await handleToolCall('recon_explain', { name: 'MyFunc' }, g);
     expect(result).not.toContain('**Community:**');
   });
 
-  it('recon_impact includes affected communities', async () => {
+  it('recon_impact shows callers with community info', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
@@ -248,8 +248,8 @@ describe('community info in handlers', () => {
       target: 'Target',
       direction: 'upstream',
     }, g);
-    expect(result).toContain('**Affected communities:**');
-    expect(result).toContain('core');
-    expect(result).toContain('web');
+    // v6 impact shows callers in depth groups
+    expect(result).toContain('Caller');
+    expect(result).toContain('WILL BREAK');
   });
 });

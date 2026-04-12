@@ -428,43 +428,39 @@ describe('hybridSearch', () => {
 
 // ─── Handler Integration Tests ──────────────────────────────────
 
-describe('hybrid search in handlers', () => {
-  it('recon_query works without vector store', async () => {
+describe('recon_find handler integration', () => {
+  it('recon_find works without vector store', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
     g.addNode(makeNode('f1', 'getUserById', { package: 'auth' }));
 
-    const result = await handleToolCall('recon_query', { query: 'getUser' }, g);
+    const result = await handleToolCall('recon_find', { query: 'getUserById' }, g);
     expect(result).toContain('getUserById');
-    expect(result).toContain('**Search:** BM25');
   });
 
-  it('recon_query indicates hybrid mode when vector store provided', async () => {
+  it('recon_find handles vector store gracefully', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
     g.addNode(makeNode('f1', 'getUserById', { package: 'auth' }));
 
-    // No embedder initialized, so even with a vector store,
-    // it should gracefully fall back to BM25
+    // recon_find uses executeFind (not BM25+vector), so vector store is ignored
     const store = new VectorStore(3);
     store.add('f1', new Float32Array([1, 0, 0]));
 
-    const result = await handleToolCall('recon_query', { query: 'getUser' }, g, undefined, store);
-    // Without embedder ready, it falls back to BM25
+    const result = await handleToolCall('recon_find', { query: 'getUserById' }, g, undefined, store);
     expect(result).toContain('getUserById');
-    expect(result).toContain('**Search:** BM25');
   });
 
-  it('recon_query still applies type filter', async () => {
+  it('recon_find applies type filter', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
     g.addNode(makeNode('f1', 'Foo', { type: NodeType.Function }));
     g.addNode(makeNode('s1', 'FooStruct', { type: NodeType.Struct }));
 
-    const result = await handleToolCall('recon_query', {
+    const result = await handleToolCall('recon_find', {
       query: 'Foo',
       type: 'Function',
     }, g);
@@ -473,22 +469,17 @@ describe('hybrid search in handlers', () => {
     expect(result).not.toContain('FooStruct');
   });
 
-  it('recon_query disables semantic with semantic: false', async () => {
+  it('recon_find returns results for exact match', async () => {
     const { handleToolCall } = await import('../../src/mcp/handlers.js');
 
     const g = new KnowledgeGraph();
     g.addNode(makeNode('f1', 'TestFunc', { package: 'core' }));
 
-    const store = new VectorStore(3);
-    store.add('f1', new Float32Array([1, 0, 0]));
-
-    const result = await handleToolCall('recon_query', {
+    const result = await handleToolCall('recon_find', {
       query: 'TestFunc',
-      semantic: false,
-    }, g, undefined, store);
+    }, g);
 
     expect(result).toContain('TestFunc');
-    expect(result).toContain('**Search:** BM25');
   });
 });
 

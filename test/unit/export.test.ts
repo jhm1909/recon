@@ -1,11 +1,11 @@
 /**
- * Unit Tests: Graph Export (Mermaid / DOT)
+ * Unit Tests: Graph Export (Mermaid)
  */
 import { describe, it, expect } from 'vitest';
 import { KnowledgeGraph } from '../../src/graph/graph.js';
 import { NodeType, RelationshipType, Language } from '../../src/graph/types.js';
 import type { Node, Relationship } from '../../src/graph/types.js';
-import { exportGraph, filterGraph, toMermaid, toDot } from '../../src/export/exporter.js';
+import { exportGraph, filterGraph, toMermaid } from '../../src/export/exporter.js';
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -74,41 +74,6 @@ describe('Graph Export', () => {
     });
   });
 
-  describe('toDot', () => {
-    it('generates valid DOT header', () => {
-      const { nodes, rels } = filterGraph(buildTestGraph(), { format: 'dot' });
-      expect(toDot(nodes, rels)).toContain('digraph recon');
-    });
-
-    it('includes node labels', () => {
-      const { nodes, rels } = filterGraph(buildTestGraph(), { format: 'dot' });
-      const output = toDot(nodes, rels);
-      expect(output).toContain('handleQuery');
-      expect(output).toContain('BM25Search');
-    });
-
-    it('includes edges with labels', () => {
-      const { nodes, rels } = filterGraph(buildTestGraph(), { format: 'dot' });
-      const output = toDot(nodes, rels);
-      expect(output).toContain('->');
-      expect(output).toContain('CALLS');
-    });
-
-    it('uses LR direction by default', () => {
-      const { nodes, rels } = filterGraph(buildTestGraph(), { format: 'dot' });
-      expect(toDot(nodes, rels)).toContain('rankdir=LR');
-    });
-
-    it('uses cluster subgraphs', () => {
-      const { nodes, rels } = filterGraph(buildTestGraph(), { format: 'dot' });
-      expect(toDot(nodes, rels)).toContain('subgraph cluster_');
-    });
-
-    it('returns empty graph message for no nodes', () => {
-      expect(toDot([], [])).toContain('No nodes');
-    });
-  });
-
   describe('filterGraph', () => {
     it('filters by package', () => {
       const { nodes } = filterGraph(buildTestGraph(), { format: 'mermaid', package: 'search' });
@@ -149,10 +114,6 @@ describe('Graph Export', () => {
       expect(exportGraph(buildTestGraph(), { format: 'mermaid' })).toContain('graph');
     });
 
-    it('generates dot', () => {
-      expect(exportGraph(buildTestGraph(), { format: 'dot' })).toContain('digraph');
-    });
-
     it('returns no-nodes for empty graph', () => {
       expect(exportGraph(new KnowledgeGraph(), { format: 'mermaid' })).toContain('No nodes');
     });
@@ -160,10 +121,6 @@ describe('Graph Export', () => {
     it('applies package filter', () => {
       const output = exportGraph(buildTestGraph(), { format: 'mermaid', package: 'search' });
       expect(output).toContain('BM25Search');
-    });
-
-    it('throws on unsupported format', () => {
-      expect(() => exportGraph(buildTestGraph(), { format: 'svg' as any })).toThrow();
     });
   });
 });

@@ -7,7 +7,7 @@
  * 3. Matches TS API calls to Go handlers by normalized URL patterns
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { NodeType, RelationshipType, Language } from '../graph/types.js';
 import type { Node, Relationship } from '../graph/types.js';
@@ -28,46 +28,106 @@ interface TSAPIConstant {
   normalized: string;   // guilds/*/modules
 }
 
+// ─── File Discovery Helpers ──────────────────────────────────
+
+/**
+ * Walk a directory tree and collect files whose name matches any of the given patterns.
+ */
+function findFilesByPattern(rootDir: string, namePatterns: RegExp[]): string[] {
+  const results: string[] = [];
+
+  const walk = (dir: string) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'vendor' ||
+          entry.name === 'dist' || entry.name === '.recon') continue;
+
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile() && namePatterns.some(p => p.test(entry.name))) {
+        results.push(full);
+      }
+    }
+  };
+
+  walk(rootDir);
+  return results;
+}
+
+/**
+ * Resolve explicit glob-style patterns (e.g. "apps/api/router/router.go") to absolute paths,
+ * or fall back to auto-discovery using namePatterns.
+ */
+function resolveFilePaths(
+  projectRoot: string,
+  explicitPatterns: string[] | undefined,
+  autoNamePatterns: RegExp[],
+): string[] {
+  if (explicitPatterns && explicitPatterns.length > 0) {
+    // Use explicit paths relative to projectRoot
+    return explicitPatterns
+      .map(p => join(projectRoot, p))
+      .filter(p => existsSync(p));
+  }
+  return findFilesByPattern(projectRoot, autoNamePatterns);
+}
+
 // ─── Go Route Extraction ─────────────────────────────────────
 
 const ROUTE_RE = /(\w+)\.(Get|Post|Put|Patch|Delete)\("([^"]+)".*?h\.(\w+)\)/g;
 const FUNC_RE = /^func\s+(\w+)\(/;
 
 /**
- * Parse router.go and extract all route registrations.
+ * Parse Go router files and extract all route registrations.
+ * Scans dynamically for files matching router*.go / route*.go patterns.
  */
-export function extractGoRoutes(projectRoot: string): APIRoute[] {
-  const routerPath = join(projectRoot, 'apps/api/router/router.go');
-  if (!existsSync(routerPath)) return [];
+export function extractGoRoutes(projectRoot: string, explicitPaths?: string[]): APIRoute[] {
+  const routerFiles = resolveFilePaths(
+    projectRoot,
+    explicitPaths,
+    [/^router.*\.go$/i, /^route.*\.go$/i],
+  );
 
-  const source = readFileSync(routerPath, 'utf-8');
+  if (routerFiles.length === 0) return [];
+
   const routes: APIRoute[] = [];
 
-  // Track current function context for prefix resolution
-  let currentFunc = '';
-  const lines = source.split('\n');
+  for (const routerPath of routerFiles) {
+    const source = readFileSync(routerPath, 'utf-8');
 
-  for (const line of lines) {
-    const funcMatch = line.match(FUNC_RE);
-    if (funcMatch) {
-      currentFunc = funcMatch[1];
+    // Track current function context for prefix resolution
+    let currentFunc = '';
+    const lines = source.split('\n');
+
+    for (const line of lines) {
+      const funcMatch = line.match(FUNC_RE);
+      if (funcMatch) {
+        currentFunc = funcMatch[1];
+      }
+
+      // Reset regex state
+      ROUTE_RE.lastIndex = 0;
+      const routeMatch = ROUTE_RE.exec(line.trim());
+      if (!routeMatch) continue;
+
+      const [, variable, method, path, handler] = routeMatch;
+      const prefix = resolvePrefix(currentFunc, variable);
+      const fullPattern = prefix + path;
+
+      routes.push({
+        method: method.toUpperCase(),
+        pattern: fullPattern,
+        handler,
+        normalized: normalizePattern(fullPattern),
+      });
     }
-
-    // Reset regex state
-    ROUTE_RE.lastIndex = 0;
-    const routeMatch = ROUTE_RE.exec(line.trim());
-    if (!routeMatch) continue;
-
-    const [, variable, method, path, handler] = routeMatch;
-    const prefix = resolvePrefix(currentFunc, variable);
-    const fullPattern = prefix + path;
-
-    routes.push({
-      method: method.toUpperCase(),
-      pattern: fullPattern,
-      handler,
-      normalized: normalizePattern(fullPattern),
-    });
   }
 
   return routes;
@@ -91,34 +151,43 @@ function resolvePrefix(funcName: string, variable: string): string {
 // ─── TS API Constant Extraction ──────────────────────────────
 
 /**
- * Parse constants.ts and extract API path patterns.
+ * Parse TS API constant files and extract API path patterns.
+ * Scans dynamically for files matching constant*.ts / api*.ts patterns.
  */
-export function extractTSAPIConstants(projectRoot: string): TSAPIConstant[] {
-  const constPath = join(projectRoot, 'apps/web/src/lib/constants.ts');
-  if (!existsSync(constPath)) return [];
+export function extractTSAPIConstants(projectRoot: string, explicitPaths?: string[]): TSAPIConstant[] {
+  const constFiles = resolveFilePaths(
+    projectRoot,
+    explicitPaths,
+    [/^constant.*\.tsx?$/i, /^api.*\.tsx?$/i],
+  );
 
-  const source = readFileSync(constPath, 'utf-8');
+  if (constFiles.length === 0) return [];
+
   const constants: TSAPIConstant[] = [];
 
-  // Match string patterns: "/api/v1/guilds"
-  const stringRe = /(\w+):\s*"(\/api\/v1\/[^"]+)"/g;
-  let m;
-  while ((m = stringRe.exec(source)) !== null) {
-    constants.push({
-      key: m[1],
-      pattern: m[2],
-      normalized: normalizePattern(m[2]),
-    });
-  }
+  for (const constPath of constFiles) {
+    const source = readFileSync(constPath, 'utf-8');
 
-  // Match template literal patterns: (id: string) => `/api/v1/guilds/${id}`
-  const templateRe = /(\w+):\s*\([^)]*\)\s*=>\s*`(\/api\/v1\/[^`]+)`/g;
-  while ((m = templateRe.exec(source)) !== null) {
-    constants.push({
-      key: m[1],
-      pattern: m[2],
-      normalized: normalizePattern(m[2]),
-    });
+    // Match string patterns: "/api/v1/guilds"
+    const stringRe = /(\w+):\s*"(\/api\/v1\/[^"]+)"/g;
+    let m;
+    while ((m = stringRe.exec(source)) !== null) {
+      constants.push({
+        key: m[1],
+        pattern: m[2],
+        normalized: normalizePattern(m[2]),
+      });
+    }
+
+    // Match template literal patterns: (id: string) => `/api/v1/guilds/${id}`
+    const templateRe = /(\w+):\s*\([^)]*\)\s*=>\s*`(\/api\/v1\/[^`]+)`/g;
+    while ((m = templateRe.exec(source)) !== null) {
+      constants.push({
+        key: m[1],
+        pattern: m[2],
+        normalized: normalizePattern(m[2]),
+      });
+    }
   }
 
   return constants;
@@ -144,9 +213,10 @@ function normalizePattern(path: string): string {
 export function buildCrossLanguageEdges(
   projectRoot: string,
   existingNodeIds: Set<string>,
+  config?: { routes?: string[]; consumers?: string[] },
 ): { result: AnalyzerResult; routes: APIRoute[] } {
-  const routes = extractGoRoutes(projectRoot);
-  const tsConstants = extractTSAPIConstants(projectRoot);
+  const routes = extractGoRoutes(projectRoot, config?.routes);
+  const tsConstants = extractTSAPIConstants(projectRoot, config?.consumers);
 
   if (routes.length === 0) {
     return { result: { nodes: [], relationships: [] }, routes: [] };

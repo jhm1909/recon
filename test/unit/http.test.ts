@@ -93,10 +93,10 @@ describe('GET /api/tools', () => {
     expect(res.body.tools.length).toBeGreaterThan(0);
 
     const names = res.body.tools.map((t: any) => t.name);
-    expect(names).toContain('recon_query');
+    expect(names).toContain('recon_find');
     expect(names).toContain('recon_impact');
-    expect(names).toContain('recon_context');
-    expect(names).toContain('recon_processes');
+    expect(names).toContain('recon_explain');
+    expect(names).toContain('recon_export');
   });
 
   it('each tool has name, description, inputSchema', async () => {
@@ -114,9 +114,9 @@ describe('GET /api/tools', () => {
 // ─── Tool Execution ─────────────────────────────────────────────
 
 describe('POST /api/tools/:name', () => {
-  it('executes recon_query and returns results', async () => {
+  it('executes recon_find and returns results', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_query')
+      .post('/api/tools/recon_find')
       .send({ query: 'GetUser' });
 
     expect(res.status).toBe(200);
@@ -124,9 +124,9 @@ describe('POST /api/tools/:name', () => {
     expect(res.body.result).toContain('GetUser');
   });
 
-  it('executes recon_context and returns symbol info', async () => {
+  it('executes recon_explain and returns symbol info', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_context')
+      .post('/api/tools/recon_explain')
       .send({ name: 'GetUser' });
 
     expect(res.status).toBe(200);
@@ -144,48 +144,42 @@ describe('POST /api/tools/:name', () => {
     expect(res.body.result).toContain('GetUser'); // Caller
   });
 
-  it('executes recon_packages and returns response', async () => {
+  it('executes recon_map and returns response', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_packages')
+      .post('/api/tools/recon_map')
       .send({});
 
     expect(res.status).toBe(200);
     expect(res.body.result).toBeDefined();
   });
 
-  it('executes recon_processes and returns flows', async () => {
-    const res = await request(app)
-      .post('/api/tools/recon_processes')
-      .send({});
-
-    expect(res.status).toBe(200);
-    expect(res.body.result).toBeDefined();
-  });
-
-  it('returns 400 for unknown tool', async () => {
+  it('returns structured error for unknown tool', async () => {
     const res = await request(app)
       .post('/api/tools/nonexistent_tool')
       .send({});
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBeDefined();
+    expect(res.status).toBe(200);
+    const parsed = JSON.parse(res.body.result);
+    expect(parsed.error).toBe('unknown_tool');
   });
 
-  it('returns 400 for missing required params', async () => {
+  it('returns structured error for missing required params', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_query')
+      .post('/api/tools/recon_find')
       .send({});
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toContain("'query'");
+    expect(res.status).toBe(200);
+    const parsed = JSON.parse(res.body.result);
+    expect(parsed.error).toBe('invalid_parameter');
   });
 
-  it('includes next-step hint in response', async () => {
+  it('returns result without next-step hint', async () => {
     const res = await request(app)
-      .post('/api/tools/recon_query')
+      .post('/api/tools/recon_find')
       .send({ query: 'GetUser' });
 
-    expect(res.body.result).toContain('**Next:**');
+    expect(res.body.result).toBeDefined();
+    expect(res.body.result).not.toContain('**Next:**');
   });
 });
 
@@ -215,11 +209,10 @@ describe('GET /api/resources/read?uri=...', () => {
     expect(res.body.content).toContain('total_relationships');
   });
 
-  it('reads recon://packages resource', async () => {
+  it('returns 404 for removed recon://packages resource', async () => {
     const res = await request(app).get('/api/resources/read?uri=recon://packages');
 
-    expect(res.status).toBe(200);
-    expect(res.body.content).toBeDefined();
+    expect(res.status).toBe(404);
   });
 
   it('reads recon://symbol/{name} resource', async () => {
@@ -247,9 +240,19 @@ describe('GET /api/resources/read?uri=...', () => {
 // ─── CORS ───────────────────────────────────────────────────────
 
 describe('CORS', () => {
-  it('includes CORS headers', async () => {
-    const res = await request(app).get('/api/health');
+  it('includes CORS headers for localhost origin', async () => {
+    const res = await request(app)
+      .get('/api/health')
+      .set('Origin', 'http://localhost:3000');
 
     expect(res.headers['access-control-allow-origin']).toBeDefined();
+  });
+
+  it('does not include CORS headers for disallowed origin', async () => {
+    const res = await request(app)
+      .get('/api/health')
+      .set('Origin', 'https://evil.example.com');
+
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
   });
 });
