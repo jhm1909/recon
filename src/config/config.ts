@@ -25,6 +25,19 @@ export interface ReconConfig {
   port?: number;
   /** Additional paths to ignore (beyond built-in defaults) */
   ignore?: string[];
+  /** Cross-language edge detection config */
+  crossLanguage?: {
+    auto?: boolean;
+    routes?: string[];
+    consumers?: string[];
+  };
+  /** Glob patterns for test file detection */
+  testPatterns?: string[];
+  /** Analysis rules */
+  rules?: {
+    largeFileThreshold?: number;
+    circularDepsLevel?: 'package' | 'file';
+  };
 }
 
 // ─── Defaults ────────────────────────────────────────────────────
@@ -37,6 +50,9 @@ const DEFAULTS: Required<ReconConfig> = {
   http: false,
   port: 3100,
   ignore: [],
+  crossLanguage: { auto: true, routes: [], consumers: [] },
+  testPatterns: ['**/*.test.*', '**/*.spec.*', '**/*_test.*', '**/__tests__/**'],
+  rules: { largeFileThreshold: 30, circularDepsLevel: 'package' as const },
 };
 
 const CONFIG_FILENAME = '.recon.json';
