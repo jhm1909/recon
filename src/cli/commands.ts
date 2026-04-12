@@ -11,7 +11,9 @@ import { KnowledgeGraph } from '../graph/graph.js';
 import { analyzeTypeScript } from '../analyzers/ts-analyzer.js';
 import { buildCrossLanguageEdges, extractGoRoutes } from '../analyzers/cross-language.js';
 import type { APIRoute } from '../analyzers/cross-language.js';
-import { saveIndex, saveSearchIndex, saveEmbeddings, loadIndex, loadEmbeddings, listRepos, loadAllRepos, defaultRepoName } from '../storage/store.js';
+import { saveIndex, saveSearchIndex, saveEmbeddings, loadIndex, loadEmbeddings, loadAllRepos } from '../storage/store.js';
+import { SqliteStore } from '../storage/sqlite.js';
+import { detectV5Index, migrateV5ToV6, detectV6Index } from '../storage/migrate.js';
 import { generateAgentsMd } from '../generators/agents-gen.js';
 import type { IndexMeta } from '../storage/types.js';
 import { startServer } from '../mcp/server.js';
@@ -25,7 +27,7 @@ import { detectCommunities } from '../graph/community.js';
 import { NodeType, RelationshipType } from '../graph/types.js';
 import { ReconWatcher } from '../watcher/watcher.js';
 import type { ProjectDir } from '../watcher/watcher.js';
-import { loadConfig, mergeWithCLI, initConfig } from '../config/config.js';
+import { loadConfig, mergeWithCLI } from '../config/config.js';
 
 /**
  * Auto-detect where TypeScript source files live.
@@ -353,6 +355,16 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
 
   await saveIndex(projectRoot, graph, meta, repoName);
 
+  // Also save to SQLite store
+  const store = new SqliteStore(projectRoot);
+  store.insertNodes([...graph.nodes.values()]);
+  store.insertRelationships([...graph.relationships.values()]);
+  store.setMeta('gitCommit', meta.gitCommit);
+  store.setMeta('indexedAt', meta.indexedAt);
+  store.setMeta('schemaVersion', '6');
+  if (meta.fileHashes) store.setMeta('fileHashes', JSON.stringify(meta.fileHashes));
+  store.close();
+
   // Generate AGENTS.md
   const agentsMd = generateAgentsMd(graph, repoName);
   const { writeFileSync, mkdirSync } = await import('node:fs');
@@ -437,6 +449,14 @@ export async function indexCommand(options: { force?: boolean; repo?: string; em
 export async function serveCommand(options?: { repo?: string; http?: boolean; port?: number; noIndex?: boolean; noWatch?: boolean; projects?: string[] }): Promise<void> {
   const projectRoot = findProjectRoot();
   const repoName = options?.repo;
+
+  // Check for v5→v6 migration
+  if (detectV5Index(projectRoot) && !detectV6Index(projectRoot)) {
+    console.log('Migrating v5 index to v6 (SQLite)...');
+    const migStore = await migrateV5ToV6(projectRoot);
+    migStore.close();
+    console.log('Migration complete.');
+  }
 
   // Load .recon.json and merge with CLI flags
   const fileConfig = loadConfig(projectRoot);
@@ -571,6 +591,12 @@ export async function statusCommand(options?: { repo?: string }): Promise<void> 
   console.log(`  Total nodes:    ${graph.nodeCount}`);
   console.log(`  Index time:     ${meta.stats.indexTimeMs}ms`);
 
+  if (detectV6Index(projectRoot)) {
+    const sqliteStore = new SqliteStore(projectRoot);
+    console.log(`  SQLite:         ${sqliteStore.nodeCount} nodes, ${sqliteStore.relationshipCount} relationships`);
+    sqliteStore.close();
+  }
+
   if (stale) {
     console.log('');
     console.log('  ??Index is stale. Run "npx recon index" to update.');
@@ -601,20 +627,6 @@ export function cleanCommand(options?: { repo?: string }): void {
     }
   }
 }
-
-// ─── Init ─────────────────────────────────────────────────────────
-
-export function initCommandFn(): void {
-  const projectRoot = findProjectRoot();
-  const created = initConfig(projectRoot);
-  if (created) {
-    console.log('[recon] Created .recon.json with defaults.');
-    console.log('[recon] Edit it to add projects, enable embeddings, configure watcher, etc.');
-  } else {
-    console.log('[recon] .recon.json already exists — skipping.');
-  }
-}
-
 
 // ═══ export command ═══════════════════════════════════════════════
 
@@ -670,36 +682,3 @@ export async function exportCommand(options: {
 }
 
 
-// ═══ review command ═══════════════════════════════════════════════
-
-export async function reviewCommand(options: {
-  scope?: string;
-  base?: string;
-  diagram?: boolean;
-  tests?: boolean;
-  repo?: string;
-}): Promise<void> {
-  const { analyzeChanges, formatReview } = await import('../review/reviewer.js');
-
-  const projectRoot = findProjectRoot();
-  const repoName = options.repo;
-
-  // Load graph
-  const stored = await loadIndex(projectRoot, repoName);
-  if (!stored) {
-    console.error("[recon] No index found. Run 'npx recon index' first.");
-    process.exit(1);
-  }
-
-  const reviewOptions = {
-    scope: (options.scope || 'all') as 'staged' | 'unstaged' | 'branch' | 'all',
-    base: options.base || 'main',
-    includeDiagram: options.diagram ?? true,
-    includeTests: options.tests ?? false,
-  };
-
-  const result = analyzeChanges(stored.graph, projectRoot, reviewOptions);
-  const report = formatReview(result, stored.graph, reviewOptions);
-
-  process.stdout.write(report + '\n');
-}
