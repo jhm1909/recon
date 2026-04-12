@@ -44,6 +44,7 @@ export enum RelationshipType {
   USES_COMPONENT = 'USES_COMPONENT', // Component → Component
   CALLS_API = 'CALLS_API',    // TS Function → Go Function (cross-language)
   EXTENDS = 'EXTENDS',        // Class → Class (inheritance)
+  USES_TYPE = 'USES_TYPE',    // Function/Component → Type (generic type argument usage)
 }
 
 export enum Language {

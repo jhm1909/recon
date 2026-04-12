@@ -60,12 +60,18 @@ interface FileCall {
   line: number;
 }
 
+interface FileTypeArgUsage {
+  typeName: string;    // The type used as a generic argument (e.g., "User" in Promise<User>)
+  line: number;
+}
+
 interface FileAnalysis {
   symbols: FileSymbol[];
   imports: FileImport[];
   reExports: FileReExport[];
   jsxComponents: Set<string>;
   calls: FileCall[];
+  typeArgUsages: FileTypeArgUsage[];
 }
 
 // ─── File Discovery ──────────────────────────────────────────
@@ -110,20 +116,57 @@ function discoverTSFiles(srcRoot: string): string[] {
 
 // ─── Path Alias Resolution ───────────────────────────────────
 
+function loadTsConfig(projectRoot: string): Record<string, unknown> {
+  const configPath = join(projectRoot, 'tsconfig.json');
+  if (!existsSync(configPath)) return {};
+
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+
+    // Follow extends chain (1 level deep)
+    if (config.extends) {
+      const basePath = resolve(projectRoot, config.extends);
+      // Support both with and without .json extension
+      const candidates = [basePath, basePath + '.json'];
+      for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+          try {
+            const base = JSON.parse(readFileSync(candidate, 'utf-8'));
+            // Merge: local compilerOptions override base
+            return {
+              ...base,
+              compilerOptions: {
+                ...(base.compilerOptions ?? {}),
+                ...(config.compilerOptions ?? {}),
+              },
+            };
+          } catch {
+            break; // Base file is malformed, use local config as-is
+          }
+        }
+      }
+    }
+
+    return config;
+  } catch {
+    return {};
+  }
+}
+
 function loadPathAliases(
   webAppRoot: string,
 ): Map<string, string> {
   const aliases = new Map<string, string>();
 
   try {
-    const raw = readFileSync(join(webAppRoot, 'tsconfig.json'), 'utf-8');
-    const config = JSON.parse(raw);
-    const paths = config?.compilerOptions?.paths;
+    const config = loadTsConfig(webAppRoot);
+    const paths = (config?.compilerOptions as Record<string, unknown>)?.paths as
+      Record<string, string[]> | undefined;
 
     if (paths) {
       for (const [pattern, targets] of Object.entries(paths)) {
         if (Array.isArray(targets) && targets.length > 0) {
-          const target = (targets as string[])[0];
+          const target = targets[0];
           // Strip trailing * from pattern and target
           const aliasKey = pattern.replace('*', '');
           const aliasValue = join(webAppRoot, target.replace('*', ''));
@@ -365,6 +408,15 @@ function analyzeSourceFile(sf: ts.SourceFile): FileAnalysis {
   const calls: FileCall[] = [];
   walkCalls(sf, calls);
 
+  // Walk entire tree for generic type argument usages (e.g., Promise<User>)
+  const importedTypeNames = new Set<string>();
+  for (const imp of imports) {
+    for (const name of imp.names) importedTypeNames.add(name);
+    if (imp.defaultName) importedTypeNames.add(imp.defaultName);
+  }
+  const typeArgUsages: FileTypeArgUsage[] = [];
+  walkTypeArgs(sf, importedTypeNames, typeArgUsages);
+
   // Post-pass: apply `export { X }` to mark symbols as exported
   if (localExportNames.size > 0) {
     for (const sym of symbols) {
@@ -374,7 +426,7 @@ function analyzeSourceFile(sf: ts.SourceFile): FileAnalysis {
     }
   }
 
-  return { symbols, imports, reExports, jsxComponents, calls };
+  return { symbols, imports, reExports, jsxComponents, calls, typeArgUsages };
 }
 
 // ─── AST Helpers ─────────────────────────────────────────────
@@ -447,6 +499,33 @@ function walkCalls(node: ts.Node, calls: FileCall[]): void {
     }
   }
   ts.forEachChild(node, (child) => walkCalls(child, calls));
+}
+
+/**
+ * Walk type references with type arguments (e.g., Promise<User>, Map<string, Handler>).
+ * Only track type arguments whose names appear in the file's import list,
+ * since parser-only mode cannot resolve types across files without imports.
+ */
+function walkTypeArgs(
+  node: ts.Node,
+  importedNames: Set<string>,
+  usages: FileTypeArgUsage[],
+): void {
+  if (ts.isTypeReferenceNode(node) && node.typeArguments) {
+    for (const typeArg of node.typeArguments) {
+      if (ts.isTypeReferenceNode(typeArg) && ts.isIdentifier(typeArg.typeName)) {
+        const name = typeArg.typeName.text;
+        if (importedNames.has(name)) {
+          const sf = node.getSourceFile();
+          usages.push({
+            typeName: name,
+            line: sf.getLineAndCharacterOfPosition(typeArg.getStart()).line + 1,
+          });
+        }
+      }
+    }
+  }
+  ts.forEachChild(node, (child) => walkTypeArgs(child, importedNames, usages));
 }
 
 function extractCallName(expr: ts.Expression): string | null {
@@ -605,6 +684,43 @@ function buildGraph(
           targetId: targetFileId,
           confidence: 1.0,
         });
+
+        // Barrel file resolution (1 level deep):
+        // If the target is a barrel file (index.ts) that re-exports,
+        // follow re-exports to create IMPORTS edges to the original sources.
+        const isBarrel = resolvedPath.endsWith('/index.ts') || resolvedPath.endsWith('/index.tsx');
+        if (isBarrel) {
+          const barrelAnalysis = fileAnalyses.get(resolvedPath);
+          if (barrelAnalysis) {
+            const importedNames = new Set([...imp.names, ...(imp.defaultName ? [imp.defaultName] : [])]);
+            const barrelAbsPath = join(projectRoot, resolvedPath);
+
+            for (const reExp of barrelAnalysis.reExports) {
+              // Check if any of our imported names are re-exported by this barrel
+              const matchesWildcard = reExp.names.includes('*');
+              const matchesNamed = reExp.names.some(n => importedNames.has(n));
+              if (!matchesWildcard && !matchesNamed && importedNames.size > 0) continue;
+
+              const originalPath = resolveImportPath(
+                reExp.from,
+                barrelAbsPath,
+                projectRoot,
+                aliases,
+              );
+
+              if (originalPath && analyzedFiles.has(originalPath) && originalPath !== resolvedPath) {
+                const originalFileId = `ts:file:${originalPath}`;
+                relationships.push({
+                  id: `rel:ts:${++relCounter}`,
+                  type: RelationshipType.IMPORTS,
+                  sourceId: fileNodeId,
+                  targetId: originalFileId,
+                  confidence: 0.9,
+                });
+              }
+            }
+          }
+        }
       }
     }
 
@@ -778,6 +894,39 @@ function buildGraph(
           }
         }
       }
+    }
+  }
+
+  // Post-pass: create USES_TYPE edges from generic type arguments
+  // e.g., Promise<User> → function USES_TYPE → User (if User is a known type node)
+  const seenTypeEdges = new Set<string>();
+  for (const [fileRelPath, analysis] of fileAnalyses) {
+    if (analysis.typeArgUsages.length === 0) continue;
+
+    for (const usage of analysis.typeArgUsages) {
+      // Find enclosing function/component for the usage site
+      const enclosingSym = findEnclosingSymbol(analysis.symbols, usage.line);
+      if (!enclosingSym) continue;
+
+      const sourcePrefix = enclosingSym.kind === 'component' ? 'ts:comp' : 'ts:func';
+      const sourceId = `${sourcePrefix}:${fileRelPath}:${enclosingSym.name}`;
+
+      // Look up the type in the typeMap
+      const targetId = typeMap.get(usage.typeName);
+      if (!targetId || targetId === sourceId) continue;
+
+      // Deduplicate
+      const edgeKey = `${sourceId}→${targetId}`;
+      if (seenTypeEdges.has(edgeKey)) continue;
+      seenTypeEdges.add(edgeKey);
+
+      relationships.push({
+        id: `rel:ts:${++relCounter}`,
+        type: RelationshipType.USES_TYPE,
+        sourceId,
+        targetId,
+        confidence: 0.8,
+      });
     }
   }
 
