@@ -6,6 +6,8 @@
  *   recon_changes, recon_rename, recon_export, recon_rules
  */
 
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 import { KnowledgeGraph } from '../graph/graph.js';
 import { NodeType, RelationshipType, Language } from '../graph/types.js';
 import type { Node, Relationship } from '../graph/types.js';
@@ -116,6 +118,86 @@ function findProjectRoot(): string {
   }
 }
 
+function detectTechStack(projectRoot: string): string[] {
+  const stack: string[] = [];
+
+  // Node.js / JavaScript
+  const pkgPath = join(projectRoot, 'package.json');
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      const detect: [string, string][] = [
+        ['next', 'Next.js'], ['react', 'React'], ['vue', 'Vue'],
+        ['@angular/core', 'Angular'], ['express', 'Express'],
+        ['@nestjs/core', 'NestJS'], ['fastify', 'Fastify'],
+        ['vite', 'Vite'], ['vitest', 'Vitest'], ['jest', 'Jest'],
+        ['tailwindcss', 'Tailwind'], ['prisma', 'Prisma'],
+      ];
+      for (const [pkg, name] of detect) {
+        if (deps[pkg]) stack.push(name);
+      }
+    } catch {}
+  }
+
+  // Go
+  const goMod = join(projectRoot, 'go.mod');
+  if (existsSync(goMod)) {
+    try {
+      const content = readFileSync(goMod, 'utf-8');
+      const goDetect: [string, string][] = [
+        ['gin-gonic/gin', 'Gin'], ['labstack/echo', 'Echo'],
+        ['gofiber/fiber', 'Fiber'], ['go-chi/chi', 'Chi'],
+      ];
+      for (const [pkg, name] of goDetect) {
+        if (content.includes(pkg)) stack.push(name);
+      }
+    } catch {}
+  }
+
+  // Python
+  for (const pyFile of ['requirements.txt', 'pyproject.toml', 'Pipfile']) {
+    const p = join(projectRoot, pyFile);
+    if (existsSync(p)) {
+      try {
+        const content = readFileSync(p, 'utf-8');
+        const pyDetect: [string, string][] = [
+          ['django', 'Django'], ['flask', 'Flask'], ['fastapi', 'FastAPI'],
+          ['pytest', 'pytest'],
+        ];
+        for (const [pkg, name] of pyDetect) {
+          if (content.toLowerCase().includes(pkg)) stack.push(name);
+        }
+      } catch {}
+      break;
+    }
+  }
+
+  // Rust
+  const cargo = join(projectRoot, 'Cargo.toml');
+  if (existsSync(cargo)) {
+    try {
+      const content = readFileSync(cargo, 'utf-8');
+      const rustDetect: [string, string][] = [
+        ['actix', 'Actix'], ['axum', 'Axum'], ['rocket', 'Rocket'], ['tokio', 'Tokio'],
+      ];
+      for (const [pkg, name] of rustDetect) {
+        if (content.includes(pkg)) stack.push(name);
+      }
+    } catch {}
+  }
+
+  // Infrastructure
+  if (existsSync(join(projectRoot, 'Dockerfile')) || existsSync(join(projectRoot, 'docker-compose.yml'))) {
+    stack.push('Docker');
+  }
+  if (existsSync(join(projectRoot, '.github', 'workflows'))) {
+    stack.push('GitHub Actions');
+  }
+
+  return [...new Set(stack)]; // deduplicate
+}
+
 // ─── Main Dispatcher ──────────────────────────────────────────
 
 /**
@@ -136,7 +218,7 @@ export async function handleToolCall(
 
   switch (name) {
     case 'recon_map':
-      return handleMap(a, graph);
+      return handleMap(a, graph, projectRoot);
 
     case 'recon_find':
       return handleFind(a, graph);
@@ -169,6 +251,7 @@ export async function handleToolCall(
 function handleMap(
   args: Record<string, unknown>,
   graph: KnowledgeGraph,
+  projectRoot?: string,
 ): string {
   const langFilter = (args?.language as string) || 'all';
 
@@ -206,12 +289,20 @@ function handleMap(
 
   const totalRels = graph.relationshipCount;
 
+  // Detect tech stack
+  const root = projectRoot || findProjectRoot();
+  const techStack = detectTechStack(root);
+
   // Format output
   const lines: string[] = [
     '# Recon -- Package Overview',
     '',
     `**Stats:** ${packages.length} packages, ${graph.nodeCount} nodes, ${totalRels} relationships`,
   ];
+
+  if (techStack.length > 0) {
+    lines.push(`**Stack:** ${techStack.join(', ')}`);
+  }
 
   // Language breakdown
   if (langCounts.size > 0) {
